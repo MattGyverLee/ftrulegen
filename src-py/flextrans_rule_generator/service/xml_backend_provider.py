@@ -1,7 +1,9 @@
+import os
+import traceback
 import xml.etree.ElementTree as ET
 
 from flextrans_rule_generator.model.rule_generator import FLExTransRuleGenerator
-from flextrans_rule_generator.model.rule import FLExTransRule
+from flextrans_rule_generator.model.rule import FLExTransRule, PermutationsValue, OverwriteRulesValue
 from flextrans_rule_generator.model.source import Source
 from flextrans_rule_generator.model.target import Target
 from flextrans_rule_generator.model.phrase import Phrase, PhraseType
@@ -18,41 +20,65 @@ class XmlBackEndProvider:
         self.rule_generator: FLExTransRuleGenerator | None = None
 
     def load_data_from_file(self, file_name: str):
-        tree = ET.parse(file_name)
-        root = tree.getroot()
-
-        gen = FLExTransRuleGenerator()
-
-        # Load overwrite_rules attribute from root element
-        overwrite_attr = root.get("overwrite_rules", "no")
-        gen.overwrite_rules = overwrite_attr == "yes"
-
-        # Load disjoint feature sets
-        disjoint_sets_elem = root.find("DisjointFeatureSets")
-        if disjoint_sets_elem is not None:
-            for disjoint_set_elem in disjoint_sets_elem.findall("DisjointFeatureSet"):
-                disjoint_set = self._parse_disjoint_feature_set(disjoint_set_elem)
-                gen.disjoint_feature_sets.append(disjoint_set)
-
-        rules_elem = root.find("FLExTransRules")
-        if rules_elem is not None:
-            for rule_elem in rules_elem.findall("FLExTransRule"):
+        try:
+            if not os.path.exists(file_name):
+                # Bootstrap: create a default file with one rule containing one source and one target word
+                gen = FLExTransRuleGenerator()
                 rule = FLExTransRule()
-                rule.name = rule_elem.get("name", "")
-                rule.description = rule_elem.get("description", "")
-                rule.create_permutations = rule_elem.get("create_permutations", "no")
-
-                source_elem = rule_elem.find("Source")
-                if source_elem is not None:
-                    rule.source = self._parse_source(source_elem)
-
-                target_elem = rule_elem.find("Target")
-                if target_elem is not None:
-                    rule.target = self._parse_target(target_elem)
-
+                rule.source.phrase.insert_new_word_at(0)
+                rule.target.phrase.insert_new_word_at(0)
                 gen.rules.append(rule)
+                self.rule_generator = gen
+                self.save_data_to_file(file_name)
+                self.load_data_from_file(file_name)
+                return
 
-        self.rule_generator = gen
+            tree = ET.parse(file_name)
+            root = tree.getroot()
+
+            gen = FLExTransRuleGenerator()
+
+            # Load overwrite_rules attribute from root element
+            overwrite_attr = root.get("overwrite_rules", "yes")
+            gen.overwrite_rules = OverwriteRulesValue.YES if overwrite_attr == "yes" else OverwriteRulesValue.NO
+
+            # Load disjoint feature sets
+            disjoint_sets_elem = root.find("DisjointFeatureSets")
+            if disjoint_sets_elem is not None:
+                for disjoint_set_elem in disjoint_sets_elem.findall("DisjointFeatureSet"):
+                    disjoint_set = self._parse_disjoint_feature_set(disjoint_set_elem)
+                    gen.disjoint_feature_sets.append(disjoint_set)
+
+            rules_elem = root.find("FLExTransRules")
+            if rules_elem is not None:
+                for rule_elem in rules_elem.findall("FLExTransRule"):
+                    rule = FLExTransRule()
+                    rule.name = rule_elem.get("name", "")
+                    desc_elem = rule_elem.find("Description")
+                    if desc_elem is not None and desc_elem.text:
+                        rule.description = desc_elem.text
+                    else:
+                        rule.description = rule_elem.get("description", "")
+                    perm_str = rule_elem.get("create_permutations", "with_head")
+                    try:
+                        rule.create_permutations = PermutationsValue(perm_str)
+                    except ValueError:
+                        rule.create_permutations = PermutationsValue.WITH_HEAD
+
+                    source_elem = rule_elem.find("Source")
+                    if source_elem is not None:
+                        rule.source = self._parse_source(source_elem)
+
+                    target_elem = rule_elem.find("Target")
+                    if target_elem is not None:
+                        rule.target = self._parse_target(target_elem)
+
+                    gen.rules.append(rule)
+
+            self.rule_generator = gen
+        except Exception as e:
+            traceback.print_exc()
+            raise
 
     def _parse_source(self, source_elem: ET.Element) -> Source:
         source = Source()
@@ -92,9 +118,7 @@ class XmlBackEndProvider:
         features_elem = word_elem.find("Features")
         if features_elem is not None:
             for feat_elem in features_elem.findall("Feature"):
-                feat = Feature()
-                feat.label = feat_elem.get("label", "")
-                feat.match = feat_elem.get("match", "")
+                feat = self._parse_feature(feat_elem)
                 word.features.append(feat)
 
         affixes_elem = word_elem.find("Affixes")
@@ -116,12 +140,23 @@ class XmlBackEndProvider:
         features_elem = affix_elem.find("Features")
         if features_elem is not None:
             for feat_elem in features_elem.findall("Feature"):
-                feat = Feature()
-                feat.label = feat_elem.get("label", "")
-                feat.match = feat_elem.get("match", "")
+                feat = self._parse_feature(feat_elem)
                 affix.features.append(feat)
 
         return affix
+
+    def _parse_feature(self, feat_elem: ET.Element) -> Feature:
+        feat = Feature()
+        feat.label = feat_elem.get("label", "")
+        feat.match = feat_elem.get("match", "")
+        feat.value = feat_elem.get("value", "")
+        feat.unmarked = feat_elem.get("unmarked_default", "")
+        ranking_str = feat_elem.get("ranking", "0")
+        try:
+            feat.ranking = int(ranking_str)
+        except ValueError:
+            feat.ranking = 0
+        return feat
 
     def _parse_disjoint_feature_set(self, disjoint_set_elem: ET.Element) -> DisjointFeatureSet:
         disjoint_set = DisjointFeatureSet()
@@ -140,43 +175,54 @@ class XmlBackEndProvider:
         return disjoint_set
 
     def save_data_to_file(self, file_name: str):
-        if self.rule_generator is None:
-            return
+        try:
+            if self.rule_generator is None:
+                return
 
-        lines = []
-        lines.append('<?xml version="1.0" encoding="utf-8"?>')
-        lines.append('<!DOCTYPE FLExTransRuleGenerator PUBLIC " -//XMLmind//DTD FLExTransRuleGenerator//EN"')
-        lines.append('"FLExTransRuleGenerator.dtd">')
+            lines = []
+            lines.append('<?xml version="1.0" encoding="utf-8"?>')
+            lines.append('<!DOCTYPE FLExTransRuleGenerator PUBLIC " -//XMLmind//DTD FLExTransRuleGenerator//EN"')
+            lines.append('"FLExTransRuleGenerator.dtd">')
 
-        # Add overwrite_rules attribute if true
-        overwrite_attr = ' overwrite_rules="yes"' if self.rule_generator.overwrite_rules else ''
-        lines.append(f"<FLExTransRuleGenerator{overwrite_attr}>")
+            overwrite_val = self.rule_generator.overwrite_rules
+            if isinstance(overwrite_val, OverwriteRulesValue):
+                overwrite_str = overwrite_val.value
+            else:
+                overwrite_str = "yes" if overwrite_val else "no"
+            lines.append(f'<FLExTransRuleGenerator overwrite_rules="{overwrite_str}">')
 
-        # Write disjoint feature sets
-        if self.rule_generator.disjoint_feature_sets:
-            lines.append("  <DisjointFeatureSets>")
-            for disjoint_set in self.rule_generator.disjoint_feature_sets:
-                self._write_disjoint_feature_set(lines, disjoint_set, 4)
-            lines.append("  </DisjointFeatureSets>")
+            # Write disjoint feature sets
+            if self.rule_generator.disjoint_feature_sets:
+                lines.append("  <DisjointFeatureSets>")
+                for disjoint_set in self.rule_generator.disjoint_feature_sets:
+                    self._write_disjoint_feature_set(lines, disjoint_set, 4)
+                lines.append("  </DisjointFeatureSets>")
 
-        lines.append("  <FLExTransRules>")
+            lines.append("  <FLExTransRules>")
 
-        for rule in self.rule_generator.rules:
-            attrs = f'name="{rule.name}"'
-            if rule.description:
-                attrs += f' description="{rule.description}"'
-            if rule.create_permutations != "no":
-                attrs += f' create_permutations="{rule.create_permutations}"'
-            lines.append(f"    <FLExTransRule {attrs}>")
-            self._write_source(lines, rule.source, 6)
-            self._write_target(lines, rule.target, 6)
-            lines.append("    </FLExTransRule>")
+            for rule in self.rule_generator.rules:
+                attrs = f'name="{rule.name}"'
+                perm_val = rule.create_permutations
+                if isinstance(perm_val, PermutationsValue):
+                    perm_str = perm_val.value
+                else:
+                    perm_str = str(perm_val)
+                attrs += f' create_permutations="{perm_str}"'
+                lines.append(f"    <FLExTransRule {attrs}>")
+                if rule.description:
+                    lines.append(f"      <Description>{rule.description}</Description>")
+                self._write_source(lines, rule.source, 6)
+                self._write_target(lines, rule.target, 6)
+                lines.append("    </FLExTransRule>")
 
-        lines.append("  </FLExTransRules>")
-        lines.append("</FLExTransRuleGenerator>")
+            lines.append("  </FLExTransRules>")
+            lines.append("</FLExTransRuleGenerator>")
 
-        with open(file_name, "w", encoding="utf-8", newline="") as f:
-            f.write("\n".join(lines))
+            with open(file_name, "w", encoding="utf-8", newline="") as f:
+                f.write("\n".join(lines))
+        except Exception as e:
+            traceback.print_exc()
+            raise
 
     def _write_source(self, lines: list[str], source: Source, indent: int):
         pad = " " * indent
@@ -216,7 +262,14 @@ class XmlBackEndProvider:
         else:
             lines.append(f"{pad}<Features>")
             for feat in features:
-                lines.append(f'{pad}  <Feature match="{feat.match}" label="{feat.label}" />')
+                attrs = f'match="{feat.match}" label="{feat.label}"'
+                if feat.value:
+                    attrs += f' value="{feat.value}"'
+                if feat.unmarked:
+                    attrs += f' unmarked_default="{feat.unmarked}"'
+                if feat.ranking > 0:
+                    attrs += f' ranking="{feat.ranking}"'
+                lines.append(f'{pad}  <Feature {attrs} />')
             lines.append(f"{pad}</Features>")
 
     def _write_affixes(self, lines: list[str], affixes: list, indent: int):
