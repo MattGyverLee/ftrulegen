@@ -9,7 +9,8 @@ class ConstituentWithFeatures(RuleConstituent):
         self.features: list = []  # list[Feature], avoid circular import
 
     def delete_feature(self, feature) -> None:
-        self.features.remove(feature)
+        if feature in self.features:
+            self.features.remove(feature)
 
     def insert_new_feature(self, label: str, match: str):
         from flextrans_rule_generator.model.feature import Feature

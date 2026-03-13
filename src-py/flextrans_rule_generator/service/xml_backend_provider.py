@@ -193,12 +193,14 @@ class XmlBackEndProvider:
 
             # Write disjoint feature sets
             if self.rule_generator.disjoint_feature_sets:
-                lines.append("  <DisjointFeatureSets>")
+                lines.append("    <DisjointFeatureSets>")
                 for disjoint_set in self.rule_generator.disjoint_feature_sets:
-                    self._write_disjoint_feature_set(lines, disjoint_set, 4)
-                lines.append("  </DisjointFeatureSets>")
+                    self._write_disjoint_feature_set(lines, disjoint_set, 8)
+                lines.append("    </DisjointFeatureSets>")
+            else:
+                lines.append("    <DisjointFeatureSets/>")
 
-            lines.append("  <FLExTransRules>")
+            lines.append("    <FLExTransRules>")
 
             for rule in self.rule_generator.rules:
                 attrs = f'name="{rule.name}"'
@@ -208,14 +210,14 @@ class XmlBackEndProvider:
                 else:
                     perm_str = str(perm_val)
                 attrs += f' create_permutations="{perm_str}"'
-                lines.append(f"    <FLExTransRule {attrs}>")
+                lines.append(f"        <FLExTransRule {attrs}>")
                 if rule.description:
-                    lines.append(f"      <Description>{rule.description}</Description>")
-                self._write_source(lines, rule.source, 6)
-                self._write_target(lines, rule.target, 6)
-                lines.append("    </FLExTransRule>")
+                    lines.append(f"            <Description>{rule.description}</Description>")
+                self._write_source(lines, rule.source, 12)
+                self._write_target(lines, rule.target, 12)
+                lines.append("        </FLExTransRule>")
 
-            lines.append("  </FLExTransRules>")
+            lines.append("    </FLExTransRules>")
             lines.append("</FLExTransRuleGenerator>")
 
             with open(file_name, "w", encoding="utf-8", newline="") as f:
@@ -227,59 +229,56 @@ class XmlBackEndProvider:
     def _write_source(self, lines: list[str], source: Source, indent: int):
         pad = " " * indent
         lines.append(f"{pad}<Source>")
-        self._write_phrase(lines, source.phrase, indent + 2)
+        self._write_phrase(lines, source.phrase, indent + 4)
         lines.append(f"{pad}</Source>")
 
     def _write_target(self, lines: list[str], target: Target, indent: int):
         pad = " " * indent
         lines.append(f"{pad}<Target>")
-        self._write_phrase(lines, target.phrase, indent + 2)
+        self._write_phrase(lines, target.phrase, indent + 4)
         lines.append(f"{pad}</Target>")
 
     def _write_phrase(self, lines: list[str], phrase: Phrase, indent: int):
         pad = " " * indent
         lines.append(f"{pad}<Phrase>")
-        lines.append(f"{pad}  <Words>")
+        lines.append(f"{pad}    <Words>")
         for word in phrase.words:
-            self._write_word(lines, word, indent + 4)
-        lines.append(f"{pad}  </Words>")
+            self._write_word(lines, word, indent + 8)
+        lines.append(f"{pad}    </Words>")
         lines.append(f"{pad}</Phrase>")
 
     def _write_word(self, lines: list[str], word: Word, indent: int):
         pad = " " * indent
         head_str = "yes" if word.head == HeadValue.YES else "no"
         cat_str = word.category if word.category else ""
-        attrs = f'id="{word.id}" category="{cat_str}" head="{head_str}"'
+        attrs = f'category="{cat_str}" head="{head_str}" id="{word.id}"'
         lines.append(f"{pad}<Word {attrs}>")
-        self._write_features(lines, word.features, indent + 2)
-        self._write_affixes(lines, word.affixes, indent + 2)
+        self._write_features(lines, word.features, indent + 4)
+        self._write_affixes(lines, word.affixes, indent + 4)
         lines.append(f"{pad}</Word>")
 
     def _write_features(self, lines: list[str], features: list, indent: int):
         pad = " " * indent
         if not features:
-            lines.append(f"{pad}<Features />")
+            lines.append(f"{pad}<Features/>")
         else:
             lines.append(f"{pad}<Features>")
             for feat in features:
-                attrs = f'match="{feat.match}" label="{feat.label}"'
-                if feat.value:
-                    attrs += f' value="{feat.value}"'
-                if feat.unmarked:
-                    attrs += f' unmarked_default="{feat.unmarked}"'
-                if feat.ranking > 0:
-                    attrs += f' ranking="{feat.ranking}"'
-                lines.append(f'{pad}  <Feature {attrs} />')
+                value_str = feat.value if feat.value else ""
+                unmarked_str = feat.unmarked if feat.unmarked else ""
+                ranking_str = str(feat.ranking) if feat.ranking else "0"
+                attrs = f'label="{feat.label}" match="{feat.match}" ranking="{ranking_str}" unmarked_default="{unmarked_str}" value="{value_str}"'
+                lines.append(f'{pad}    <Feature {attrs}/>')
             lines.append(f"{pad}</Features>")
 
     def _write_affixes(self, lines: list[str], affixes: list, indent: int):
         pad = " " * indent
         if not affixes:
-            lines.append(f"{pad}<Affixes />")
+            lines.append(f"{pad}<Affixes/>")
         else:
             lines.append(f"{pad}<Affixes>")
             for affix in affixes:
-                self._write_affix(lines, affix, indent + 2)
+                self._write_affix(lines, affix, indent + 4)
             lines.append(f"{pad}</Affixes>")
 
     def _write_affix(self, lines: list[str], affix: Affix, indent: int):
