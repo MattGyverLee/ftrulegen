@@ -1,10 +1,11 @@
 from __future__ import annotations
-from flextrans_rule_generator.model.phrase import Phrase, PhraseType
+from flextrans_rule_generator.model.source import ConstituentWithPhrase
+from flextrans_rule_generator.model.phrase import PhraseType
 
 
-class Target:
+class Target(ConstituentWithPhrase):
     def __init__(self):
-        self.phrase: Phrase = Phrase()
+        super().__init__()
         self.phrase.type = PhraseType.TARGET
 
     def duplicate(self) -> Target:

@@ -47,6 +47,35 @@ class DisjointFeatureSet:
                 return pairing
         return None
 
+    def has_flex_feature_in_list(self, flex_features: list) -> bool:
+        """Check if all pairings have a matching FLEx feature in the given list."""
+        for pairing in self.feature_value_pairings:
+            s_flex_feature_name = pairing.flex_feature_name
+            found = any(f.name == s_flex_feature_name for f in flex_features)
+            if not found:
+                return False
+        return True
+
+    def remove_pairings_from(self, index: int) -> None:
+        """Remove pairings from given index onwards (valid range: 3-6)."""
+        if index < 3 or index > 6:
+            return
+        i_size = len(self.feature_value_pairings)
+        for i in range(i_size, index - 1, -1):
+            if i - 1 < len(self.feature_value_pairings):
+                del self.feature_value_pairings[i - 1]
+
+    def get_values_as_list_of_strings(self) -> list[str]:
+        """Get a string representation of all pairings."""
+        sb = []
+        for i, pairing in enumerate(self.feature_value_pairings):
+            sb.append(pairing.flex_feature_name)
+            sb.append(" / ")
+            sb.append(pairing.co_feature_value)
+            if i < len(self.feature_value_pairings) - 1:
+                sb.append("\n")
+        return ["".join(sb)]
+
     def __repr__(self) -> str:
         return (
             f"DisjointFeatureSet(co_feature_name='{self.co_feature_name}', "

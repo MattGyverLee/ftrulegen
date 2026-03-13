@@ -26,11 +26,19 @@ class ConstituentWithFeatures(RuleConstituent):
                 return constituent
         return None
 
-    def _produce_html_for_features(self) -> str:
-        parts = []
-        for feature in self.features:
-            parts.append(feature.produce_html())
-        return "".join(parts)
+    def _produce_html_for_features(self, is_head: bool = False) -> None:
+        """Produce HTML for features, appending to self._html_sb."""
+        if len(self.features) > 0:
+            self._html_sb.append("<li>")
+            self._html_sb.append('<table class="tf-nc">\n')
+            for feature in self.features:
+                self._html_sb.append("<tr>\n")
+                self._html_sb.append('<td align="left">')
+                self._html_sb.append(feature.produce_html(is_head))
+                self._html_sb.append("</td>\n")
+                self._html_sb.append("</tr>\n")
+            self._html_sb.append("</table>\n")
+            self._html_sb.append("</li>\n")
 
     def _duplicate_features(self) -> list:
         return [f.duplicate() for f in self.features]
