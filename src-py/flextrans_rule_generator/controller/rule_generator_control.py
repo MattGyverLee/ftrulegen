@@ -56,7 +56,7 @@ from flextrans_rule_generator.controller.category_chooser import CategoryChooser
 from flextrans_rule_generator.controller.feature_value_chooser import FeatureValueChooser
 from flextrans_rule_generator.controller.disjoint_features_dialog import DisjointFeaturesDialog
 from flextrans_rule_generator.model.rule_generator import FLExTransRuleGenerator
-from flextrans_rule_generator.model.rule import FLExTransRule
+from flextrans_rule_generator.model.rule import FLExTransRule, PermutationsValue
 from flextrans_rule_generator.model.rule_constituent import RuleConstituent
 from flextrans_rule_generator.model.phrase import Phrase, PhraseType
 from flextrans_rule_generator.model.word import Word, HeadValue
@@ -64,9 +64,12 @@ from flextrans_rule_generator.model.category import Category
 from flextrans_rule_generator.model.feature import Feature
 from flextrans_rule_generator.model.affix import Affix, AffixType
 from flextrans_rule_generator.flex_model.flex_data import FLExData
+from flextrans_rule_generator.flex_model.flex_feature import FLExFeature
+from flextrans_rule_generator.flex_model.flex_feature_value import FLExFeatureValue
 from flextrans_rule_generator.service.web_page_producer import WebPageProducer
 from flextrans_rule_generator.service.constituent_finder import ConstituentFinder
 from flextrans_rule_generator.service.rule_identifier_setter import RuleIdentifierAndParentSetter
+from flextrans_rule_generator.service.validity_checker import ValidityChecker
 
 
 class RuleGeneratorControl(QMainWindow):
@@ -196,9 +199,9 @@ class RuleGeneratorControl(QMainWindow):
         perm_layout = QHBoxLayout()
         perm_layout.addWidget(QLabel(strings.CREATE_PERMUTATIONS))
         self.create_permutations_combo = QComboBox()
-        self.create_permutations_combo.addItem(strings.NO)
-        self.create_permutations_combo.addItem(strings.YES)
-        self.create_permutations_combo.currentTextChanged.connect(self._on_create_permutations_changed)
+        for pv in PermutationsValue:
+            self.create_permutations_combo.addItem(pv.get_string(), pv)
+        self.create_permutations_combo.currentIndexChanged.connect(self._on_create_permutations_changed)
         perm_layout.addWidget(self.create_permutations_combo)
         perm_layout.addStretch()
         form_layout.addLayout(perm_layout)
@@ -254,23 +257,26 @@ class RuleGeneratorControl(QMainWindow):
         self.rule_menu.addSeparator()
         self.rule_act_delete = self._add_action(self.rule_menu, strings.CM_DELETE, self._rule_delete)
 
-        # --- Word context menu (C# order: Duplicate, Insert Before, Insert After, -, Move Left, Move Right, -, Delete, -, Insert Prefix, Insert Suffix, Insert Category, Insert Feature, Mark As Head, Remove Head Marking) ---
+        # --- Word context menu (Java order: Duplicate, -, ChangeNumber, MarkAsHead, RemoveHeadMarking, -, InsertBefore, InsertAfter, -, InsertPrefix, InsertSuffix, InsertCategory, InsertFeature, -, MoveLeft, MoveRight, -, Delete) ---
         self.word_menu = QMenu(self)
         self.word_act_duplicate = self._add_action(self.word_menu, strings.CM_DUPLICATE, self._word_duplicate)
+        self.word_menu.addSeparator()
+        self.word_act_change_number = self._add_action(self.word_menu, strings.CM_CHANGE_NUMBER, self._word_change_number)
+        self.word_act_mark_as_head = self._add_action(self.word_menu, strings.CM_MARK_AS_HEAD, self._word_mark_as_head)
+        self.word_act_remove_head_marking = self._add_action(self.word_menu, strings.CM_REMOVE_HEAD_MARKING, self._word_remove_head_marking)
+        self.word_menu.addSeparator()
         self.word_act_insert_before = self._add_action(self.word_menu, strings.CM_INSERT_BEFORE, self._word_insert_before)
         self.word_act_insert_after = self._add_action(self.word_menu, strings.CM_INSERT_AFTER, self._word_insert_after)
-        self.word_menu.addSeparator()
-        self.word_act_move_left = self._add_action(self.word_menu, strings.CM_MOVE_LEFT, self._word_move_left)
-        self.word_act_move_right = self._add_action(self.word_menu, strings.CM_MOVE_RIGHT, self._word_move_right)
-        self.word_menu.addSeparator()
-        self.word_act_delete = self._add_action(self.word_menu, strings.CM_DELETE, self._word_delete)
         self.word_menu.addSeparator()
         self.word_act_insert_prefix = self._add_action(self.word_menu, strings.CM_INSERT_PREFIX, self._word_insert_prefix)
         self.word_act_insert_suffix = self._add_action(self.word_menu, strings.CM_INSERT_SUFFIX, self._word_insert_suffix)
         self.word_act_insert_category = self._add_action(self.word_menu, strings.CM_INSERT_CATEGORY, self._word_insert_category)
         self.word_act_insert_feature = self._add_action(self.word_menu, strings.CM_INSERT_FEATURE, self._word_insert_feature)
-        self.word_act_mark_as_head = self._add_action(self.word_menu, strings.CM_MARK_AS_HEAD, self._word_mark_as_head)
-        self.word_act_remove_head_marking = self._add_action(self.word_menu, strings.CM_REMOVE_HEAD_MARKING, self._word_remove_head_marking)
+        self.word_menu.addSeparator()
+        self.word_act_move_left = self._add_action(self.word_menu, strings.CM_MOVE_LEFT, self._word_move_left)
+        self.word_act_move_right = self._add_action(self.word_menu, strings.CM_MOVE_RIGHT, self._word_move_right)
+        self.word_menu.addSeparator()
+        self.word_act_delete = self._add_action(self.word_menu, strings.CM_DELETE, self._word_delete)
 
         # --- Category context menu (C# order: Edit, -, Delete) ---
         self.category_menu = QMenu(self)
@@ -278,26 +284,31 @@ class RuleGeneratorControl(QMainWindow):
         self.category_menu.addSeparator()
         self._add_action(self.category_menu, strings.CM_DELETE, self._category_delete)
 
-        # --- Feature context menu (C# order: Edit, -, Delete) ---
+        # --- Feature context menu (Java order: Edit, EditUnmarked, EditRanking, -, Delete, DeleteUnmarked, DeleteRanking) ---
         self.feature_menu = QMenu(self)
         self._add_action(self.feature_menu, strings.CM_EDIT, self._feature_edit)
+        self.feature_act_edit_unmarked = self._add_action(self.feature_menu, strings.CM_EDIT_UNMARKED, self._feature_edit_unmarked)
+        self.feature_act_edit_ranking = self._add_action(self.feature_menu, strings.CM_EDIT_RANKING, self._feature_edit_ranking)
         self.feature_menu.addSeparator()
         self._add_action(self.feature_menu, strings.CM_DELETE, self._feature_delete)
+        self.feature_act_delete_unmarked = self._add_action(self.feature_menu, strings.CM_DELETE_UNMARKED, self._feature_delete_unmarked)
+        self.feature_act_delete_ranking = self._add_action(self.feature_menu, strings.CM_DELETE_RANKING, self._feature_delete_ranking)
 
-        # --- Affix context menu (C# order: Duplicate, Insert Prefix Before, Insert Prefix After, Insert Suffix Before, Insert Suffix After, -, Move Left, Move Right, -, Delete, -, Insert Feature) ---
+        # --- Affix context menu (Java order: Duplicate, -, ToggleAffixType, InsertPrefixBefore/After, InsertSuffixBefore/After, InsertFeature, -, MoveLeft, MoveRight, -, Delete) ---
         self.affix_menu = QMenu(self)
         self._add_action(self.affix_menu, strings.CM_DUPLICATE, self._affix_duplicate)
+        self.affix_menu.addSeparator()
+        self._add_action(self.affix_menu, strings.CM_TOGGLE_AFFIX_TYPE, self._affix_toggle_type)
         self._add_action(self.affix_menu, strings.CM_INSERT_PREFIX_BEFORE, self._affix_insert_prefix_before)
         self._add_action(self.affix_menu, strings.CM_INSERT_PREFIX_AFTER, self._affix_insert_prefix_after)
         self._add_action(self.affix_menu, strings.CM_INSERT_SUFFIX_BEFORE, self._affix_insert_suffix_before)
         self._add_action(self.affix_menu, strings.CM_INSERT_SUFFIX_AFTER, self._affix_insert_suffix_after)
+        self.affix_act_insert_feature = self._add_action(self.affix_menu, strings.CM_INSERT_FEATURE, self._affix_insert_feature)
         self.affix_menu.addSeparator()
         self.affix_act_move_left = self._add_action(self.affix_menu, strings.CM_MOVE_LEFT, self._affix_move_left)
         self.affix_act_move_right = self._add_action(self.affix_menu, strings.CM_MOVE_RIGHT, self._affix_move_right)
         self.affix_menu.addSeparator()
         self._add_action(self.affix_menu, strings.CM_DELETE, self._affix_delete)
-        self.affix_menu.addSeparator()
-        self._add_action(self.affix_menu, strings.CM_INSERT_FEATURE, self._affix_insert_feature)
 
     @staticmethod
     def _add_action(menu: QMenu, text: str, slot) -> QAction:
@@ -310,62 +321,47 @@ class RuleGeneratorControl(QMainWindow):
     # ------------------------------------------------------------------
 
     def fill_rules_list(self):
-        import sys
-        print("[DEBUG] fill_rules_list: starting", file=sys.stderr, flush=True)
         self.rules_list.blockSignals(True)
-        print("[DEBUG] fill_rules_list: signals blocked", file=sys.stderr, flush=True)
         self.rules_list.clear()
-        print("[DEBUG] fill_rules_list: list cleared", file=sys.stderr, flush=True)
         if self.rule_generator:
-            print(f"[DEBUG] fill_rules_list: adding {len(self.rule_generator.rules)} rules", file=sys.stderr, flush=True)
-            for i, rule in enumerate(self.rule_generator.rules):
-                print(f"[DEBUG] fill_rules_list: adding rule {i}: {str(rule)}", file=sys.stderr, flush=True)
+            for rule in self.rule_generator.rules:
                 self.rules_list.addItem(str(rule))
-                print(f"[DEBUG] fill_rules_list: added rule {i}", file=sys.stderr, flush=True)
-        print("[DEBUG] fill_rules_list: unblocking signals", file=sys.stderr, flush=True)
         self.rules_list.blockSignals(False)
-        print("[DEBUG] fill_rules_list: signals unblocked", file=sys.stderr, flush=True)
         if self.rule_generator and self.rule_generator.rules:
-            print("[DEBUG] fill_rules_list: setting current row", file=sys.stderr, flush=True)
             index = min(self.last_selected_rule, len(self.rule_generator.rules) - 1)
             index = max(index, 0)
-            print(f"[DEBUG] fill_rules_list: setting current row to {index}", file=sys.stderr, flush=True)
             self.rules_list.setCurrentRow(index)
-            print("[DEBUG] fill_rules_list: current row set", file=sys.stderr, flush=True)
-        print("[DEBUG] fill_rules_list: finished", file=sys.stderr, flush=True)
 
     # ------------------------------------------------------------------
     # Rule selection
     # ------------------------------------------------------------------
 
     def _on_rule_selected(self, row: int):
-        import sys
-        print(f"[DEBUG] _on_rule_selected called with row={row}", file=sys.stderr, flush=True)
         if row < 0 or not self.rule_generator or row >= len(self.rule_generator.rules):
-            print(f"[DEBUG] _on_rule_selected: invalid row", file=sys.stderr, flush=True)
             self.selected_rule = None
             self.rule_name_edit.clear()
             return
-        print(f"[DEBUG] _on_rule_selected: setting selected_rule", file=sys.stderr, flush=True)
         self.selected_rule = self.rule_generator.rules[row]
         self.last_selected_rule = row
-        print(f"[DEBUG] _on_rule_selected: setting name text", file=sys.stderr, flush=True)
         self.rule_name_edit.setText(self.selected_rule.name)
         # Update description field from selected rule
-        self.description_text.blockSignals(True)
-        self.description_text.setPlainText(self.selected_rule.description)
-        self.description_text.blockSignals(False)
-        # Update create permutations checkbox from selected rule
-        self.create_permutations_check.blockSignals(True)
-        self.create_permutations_check.setChecked(self.selected_rule.create_permutations == "yes")
-        self.create_permutations_check.blockSignals(False)
+        self.description_edit.blockSignals(True)
+        self.description_edit.setPlainText(self.selected_rule.description)
+        self.description_edit.blockSignals(False)
+        # Update create permutations combo from selected rule
+        self.create_permutations_combo.blockSignals(True)
+        pv = self.selected_rule.create_permutations
+        for i in range(self.create_permutations_combo.count()):
+            if self.create_permutations_combo.itemData(i) == pv:
+                self.create_permutations_combo.setCurrentIndex(i)
+                break
+        self.create_permutations_combo.blockSignals(False)
         # Update checkbox state from rule_generator
         self.overwrite_rules_check.blockSignals(True)
         self.overwrite_rules_check.setChecked(self.rule_generator.overwrite_rules)
         self.overwrite_rules_check.blockSignals(False)
-        print(f"[DEBUG] _on_rule_selected: calling _show_rule_in_web_page", file=sys.stderr, flush=True)
+        self._enable_disable_create_permutations(self.selected_rule)
         self._show_rule_in_web_page()
-        print(f"[DEBUG] _on_rule_selected: finished", file=sys.stderr, flush=True)
 
     def _on_rule_name_changed(self, text: str):
         if self.selected_rule is None:
@@ -379,13 +375,15 @@ class RuleGeneratorControl(QMainWindow):
     def _on_description_changed(self):
         if self.selected_rule is None:
             return
-        self.selected_rule.description = self.description_text.toPlainText()
+        self.selected_rule.description = self.description_edit.toPlainText()
         self._mark_dirty()
 
-    def _on_create_permutations_changed(self, state: int):
+    def _on_create_permutations_changed(self, index: int):
         if self.selected_rule is None:
             return
-        self.selected_rule.create_permutations = "yes" if state == Qt.CheckState.Checked else "no"
+        pv = self.create_permutations_combo.itemData(index)
+        if pv is not None:
+            self.selected_rule.create_permutations = pv
         self._mark_dirty()
 
     def _on_overwrite_rules_changed(self, state: int):
@@ -397,41 +395,37 @@ class RuleGeneratorControl(QMainWindow):
     def _on_set_disjoint_features(self):
         if self.rule_generator is None:
             return
-
         if self.flex_data is None:
-            QMessageBox.warning(
+            return
+        if not self._is_ok_to_show_disjoint_features_editor():
+            QMessageBox.critical(
                 self,
-                "Warning",
-                "FLEx data is not available. Cannot open disjoint features dialog."
+                strings.DISJOINT_VALIDITY_HEADER,
+                f"{strings.DISJOINT_VALIDITY_HEADERTEXT}\n\n{strings.DISJOINT_VALIDITY_MESSAGE}"
             )
             return
-
         dialog = DisjointFeaturesDialog(
             self,
             self.rule_generator.disjoint_feature_sets,
             self.flex_data
         )
-        if dialog.exec() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.rule_generator.disjoint_feature_sets = dialog.get_disjoint_sets()
-            self._mark_dirty()
+            self._report_changes_made()
 
     # ------------------------------------------------------------------
     # Web page display
     # ------------------------------------------------------------------
 
     def _show_rule_in_web_page(self):
-        import sys
-        print(f"[DEBUG] _show_rule_in_web_page called", file=sys.stderr, flush=True)
         if self.selected_rule is None:
-            print(f"[DEBUG] _show_rule_in_web_page: selected_rule is None", file=sys.stderr, flush=True)
             return
-        print(f"[DEBUG] _show_rule_in_web_page: producing web page", file=sys.stderr, flush=True)
         html = self.producer.produce_web_page(self.selected_rule)
-        print(f"[DEBUG] _show_rule_in_web_page: web page produced, length={len(html)}", file=sys.stderr, flush=True)
 
         if WEBENGINE_AVAILABLE:
-            print(f"[DEBUG] _show_rule_in_web_page: WebEngine available", file=sys.stderr, flush=True)
             # Inject QWebChannel bridge before </head>
+            # The Java toApp(msg,event) sends msg to the app and uses event for coords.
+            # In PyQt, we pass the message via QWebChannel and capture screen coords.
             bridge_script = (
                 '<script src="qrc:///qtwebchannel/qwebchannel.js"></script>\n'
                 "<script>\n"
@@ -439,49 +433,34 @@ class RuleGeneratorControl(QMainWindow):
                 "new QWebChannel(qt.webChannelTransport, function(channel) {\n"
                 "    bridge = channel.objects.bridge;\n"
                 "});\n"
-                "function toApp(msg) {\n"
-                "    if (bridge) { bridge.receive_message(msg); }\n"
-                "    return false;\n"
-                "}\n"
                 "</script>"
             )
-            # Remove original toApp function produced by WebPageProducer
+            # Replace the Java-style toApp function produced by WebPageProducer
+            # with one that sends to the QWebChannel bridge
             html = html.replace(
-                "function toApp(msg) {\n"
-                "window.chrome.webview.postMessage(msg);\n"
+                "function toApp(msg,event) {\n"
+                "ftRuleGenApp.setXCoord(event.screenX);\n"
+                "ftRuleGenApp.setYCoord(event.screenY);\n"
+                "ftRuleGenApp.setItemClickedOn(msg);\n"
                 "return false;\n"
                 "}",
-                "",
+                "function toApp(msg,event) {\n"
+                "if (bridge) { bridge.receive_message(msg); }\n"
+                "return false;\n"
+                "}",
             )
             html = html.replace("</head>", bridge_script + "\n</head>")
 
-        print(f"[DEBUG] _show_rule_in_web_page: calling setHtml", file=sys.stderr, flush=True)
-        print(f"[DEBUG] _show_rule_in_web_page: web_view type={type(self.web_view).__name__}", file=sys.stderr, flush=True)
-
         try:
             if WEBENGINE_AVAILABLE:
-                # QWebEngineView supports baseUrl parameter
                 base_url = QUrl.fromLocalFile(
                     str(Path(__file__).parent.parent / "resources") + "/"
                 )
-                print(f"[DEBUG] _show_rule_in_web_page: calling setHtml with base_url", file=sys.stderr, flush=True)
                 self.web_view.setHtml(html, base_url)
             else:
-                # QTextBrowser may not handle baseUrl the same way
-                print(f"[DEBUG] _show_rule_in_web_page: calling setHtml without base_url (QTextBrowser)", file=sys.stderr, flush=True)
                 self.web_view.setHtml(html)
-            print(f"[DEBUG] _show_rule_in_web_page: setHtml completed", file=sys.stderr, flush=True)
-        except Exception as e:
-            print(f"[ERROR] setHtml failed: {str(e)}", file=sys.stderr, flush=True)
-            import traceback
-            traceback.print_exc(file=sys.stderr)
-            # Fallback: show plain text version
-            try:
-                plain = html.replace("<", "&lt;").replace(">", "&gt;")
-                self.web_view.setHtml(f"<pre>{plain}</pre>")
-                print(f"[DEBUG] Fallback setHtml succeeded", file=sys.stderr, flush=True)
-            except Exception as e2:
-                print(f"[ERROR] Fallback also failed: {str(e2)}", file=sys.stderr, flush=True)
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Web message processing
@@ -521,6 +500,7 @@ class RuleGeneratorControl(QMainWindow):
         elif msg_type == "f":
             if isinstance(constituent, Feature):
                 self.feature = constituent
+                self._adjust_feature_context_menu()
                 self._show_menu_at_cursor(self.feature_menu)
         elif msg_type == "a":
             if isinstance(constituent, Affix):
@@ -553,11 +533,7 @@ class RuleGeneratorControl(QMainWindow):
         index = self._current_rule_index()
         if index < 0:
             index = 0
-        new_rule = FLExTransRule()
-        self.rule_generator.rules.insert(index, new_rule)
-        self._mark_dirty()
-        self.fill_rules_list()
-        self.rules_list.setCurrentRow(index)
+        self._insert_new_rule(index)
 
     def _rule_insert_after(self):
         if not self.rule_generator:
@@ -565,7 +541,12 @@ class RuleGeneratorControl(QMainWindow):
         index = self._current_rule_index() + 1
         if index <= 0:
             index = len(self.rule_generator.rules)
+        self._insert_new_rule(min(len(self.rule_generator.rules), index))
+
+    def _insert_new_rule(self, index: int):
         new_rule = FLExTransRule()
+        new_rule.source.phrase.insert_new_word_at(0)
+        new_rule.target.phrase.insert_new_word_at(0)
         self.rule_generator.rules.insert(index, new_rule)
         self._mark_dirty()
         self.fill_rules_list()
@@ -590,14 +571,14 @@ class RuleGeneratorControl(QMainWindow):
         if index < 0 or index >= len(self.rule_generator.rules):
             return
         del self.rule_generator.rules[index]
+        if len(self.rule_generator.rules) == 0:
+            # Insert a new default rule if we deleted the last one
+            self._rule_insert_before()
         self._mark_dirty()
         self.fill_rules_list()
         if self.rule_generator.rules:
             new_index = min(index, len(self.rule_generator.rules) - 1)
             self.rules_list.setCurrentRow(new_index)
-        else:
-            self.selected_rule = None
-            self.web_view.setHtml("")
 
     def _rule_move_up(self):
         if not self.rule_generator:
@@ -650,8 +631,8 @@ class RuleGeneratorControl(QMainWindow):
         if index < 0:
             return
         phrase.insert_new_word_at(index)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self._enable_disable_create_permutations(self.selected_rule)
+        self._report_changes_made()
 
     def _word_insert_after(self):
         phrase = self._get_parent_phrase()
@@ -660,9 +641,9 @@ class RuleGeneratorControl(QMainWindow):
         index = self._word_index_in_phrase(phrase)
         if index < 0:
             return
-        phrase.insert_new_word_at(index + 1)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        phrase.insert_new_word_at(min(len(phrase.words), index + 1))
+        self._enable_disable_create_permutations(self.selected_rule)
+        self._report_changes_made()
 
     def _word_duplicate(self):
         phrase = self._get_parent_phrase()
@@ -671,11 +652,9 @@ class RuleGeneratorControl(QMainWindow):
         index = self._word_index_in_phrase(phrase)
         if index < 0:
             return
-        dup = self.word.duplicate()
-        dup.id = str(len(phrase.words) + 1)
-        phrase.insert_word_at(dup, index + 1)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        dup = self.word.duplicate(True)
+        phrase.insert_word_at(dup, min(len(phrase.words), index + 1))
+        self._report_changes_made()
 
     def _word_delete(self):
         phrase = self._get_parent_phrase()
@@ -685,8 +664,8 @@ class RuleGeneratorControl(QMainWindow):
         if index < 0:
             return
         phrase.delete_word_at(index)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self._enable_disable_create_permutations(self.selected_rule)
+        self._report_changes_made()
 
     def _word_move_left(self):
         phrase = self._get_parent_phrase()
@@ -696,8 +675,7 @@ class RuleGeneratorControl(QMainWindow):
         if index <= 0:
             return
         phrase.swap_position_of_words(index, index - 1)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self._report_changes_made()
 
     def _word_move_right(self):
         phrase = self._get_parent_phrase()
@@ -707,64 +685,75 @@ class RuleGeneratorControl(QMainWindow):
         if index < 0 or index >= len(phrase.words) - 1:
             return
         phrase.swap_position_of_words(index, index + 1)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self._report_changes_made()
 
     def _word_mark_as_head(self):
         phrase = self._get_parent_phrase()
         if phrase is None or self.word is None:
             return
-        phrase.mark_word_as_head(self.word)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        for w in phrase.words:
+            if w.head == HeadValue.YES:
+                w.head = HeadValue.NO
+        self.word.head = HeadValue.YES
+        self._enable_disable_create_permutations(self.selected_rule)
+        self._report_changes_made()
 
     def _word_remove_head_marking(self):
         if self.word is None:
             return
         self.word.head = HeadValue.NO
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self._enable_disable_create_permutations(self.selected_rule)
+        self._report_changes_made()
+
+    def _word_change_number(self):
+        if self.word is None:
+            return
+        phrase = self._get_parent_phrase()
+        if phrase is None:
+            return
+        index = self._word_index_in_phrase(phrase)
+        if index < 0:
+            return
+        from PyQt6.QtWidgets import QInputDialog
+        id_numbers = [str(i) for i in range(1, 21)]
+        old_id = self.word.id
+        chosen, ok = QInputDialog.getItem(
+            self, strings.ID_CHOOSER_HEADER, strings.ID_CHOOSER_CHOOSE,
+            id_numbers, id_numbers.index(old_id) if old_id in id_numbers else 0, False
+        )
+        if ok:
+            phrase.change_id_of_word(index, old_id, chosen)
+            self._report_changes_made()
 
     def _word_insert_category(self):
         if self.word is None or self.flex_data is None:
             return
-        phrase = self._get_parent_phrase()
-        if phrase is None:
-            return
-        categories = self._get_categories_for_phrase(phrase)
-        chosen = self._launch_category_chooser(categories)
-        if chosen is not None:
-            self.word.insert_category(chosen.abbreviation)
-            self._mark_dirty()
-            self._show_rule_in_web_page()
+        self.category = self.word.category_constituent
+        self._process_insert_category()
+        self.word.category_constituent = self.category
+        self.word.category = self.category.name
+        self._report_changes_made()
 
     def _word_insert_feature(self):
         if self.word is None or self.flex_data is None:
             return
-        phrase = self._get_parent_phrase()
-        if phrase is None:
-            return
-        features = self._get_features_for_phrase(phrase)
-        result = self._launch_feature_chooser(features)
-        if result is not None:
-            label, match = result
-            self.word.insert_new_feature(label, match)
-            self._mark_dirty()
-            self._show_rule_in_web_page()
+        self.word.insert_new_feature("", "")
+        self.feature = self.word.features[-1]
+        self.feature.parent = self.word
+        self._process_insert_feature(True)
+        self._report_changes_made()
 
     def _word_insert_prefix(self):
         if self.word is None:
             return
-        self.word.insert_new_affix_at(AffixType.PREFIX, 0)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self.word.insert_new_affix_at(AffixType.PREFIX, max(0, len(self.word.affixes) - 1))
+        self._report_changes_made()
 
     def _word_insert_suffix(self):
         if self.word is None:
             return
-        self.word.insert_new_affix_at(AffixType.SUFFIX, 0)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self.word.insert_new_affix_at(AffixType.SUFFIX, max(0, len(self.word.affixes) - 1))
+        self._report_changes_made()
 
     # ------------------------------------------------------------------
     # Category context menu handlers
@@ -773,30 +762,28 @@ class RuleGeneratorControl(QMainWindow):
     def _category_edit(self):
         if self.category is None or self.flex_data is None:
             return
-        # Determine which phrase this category belongs to
-        word = self._find_word_for_category()
-        if word is None:
-            return
-        phrase = self._find_phrase_for_word(word)
+        self._process_insert_category()
+
+    def _process_insert_category(self):
+        phrase = self.category.get_phrase() if self.category else None
         if phrase is None:
             return
-        categories = self._get_categories_for_phrase(phrase)
-        chosen = self._launch_category_chooser(categories)
-        if chosen is not None:
-            self.category.name = chosen.abbreviation
-            word.category = chosen.abbreviation
-            self._mark_dirty()
-            self._show_rule_in_web_page()
+        rule = phrase.parent
+        if rule is None:
+            return
+        if phrase == rule.source.phrase:
+            self._launch_category_chooser(self.flex_data.source_data.categories)
+        else:
+            self._launch_category_chooser(self.flex_data.target_data.categories)
 
     def _category_delete(self):
         if self.category is None:
             return
-        word = self._find_word_for_category()
-        if word is None:
+        self.word = self._find_word_for_category()
+        if self.word is None:
             return
-        word.delete_category()
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self.word.delete_category()
+        self._report_changes_made()
 
     # ------------------------------------------------------------------
     # Feature context menu handlers
@@ -805,31 +792,61 @@ class RuleGeneratorControl(QMainWindow):
     def _feature_edit(self):
         if self.feature is None or self.flex_data is None:
             return
-        parent = self.feature.parent
-        if parent is None:
-            return
-        phrase = self._find_phrase_for_constituent(parent)
-        if phrase is None:
-            return
-        features = self._get_features_for_phrase(phrase)
-        result = self._launch_feature_chooser(features, self.feature.label, self.feature.match)
-        if result is not None:
-            label, match = result
-            self.feature.label = label
-            self.feature.match = match
-            self._mark_dirty()
-            self._show_rule_in_web_page()
+        self._process_insert_feature(False)
 
     def _feature_delete(self):
         if self.feature is None:
             return
-        parent = self.feature.parent
-        if parent is None:
+        constituent = self.feature.parent
+        if isinstance(constituent, Word):
+            self.word = constituent
+            self.word.delete_feature(self.feature)
+            self._report_changes_made()
+        elif isinstance(constituent, Affix):
+            self.affix = constituent
+            self.affix.delete_feature(self.feature)
+            self._report_changes_made()
+
+    def _feature_delete_unmarked(self):
+        if self.feature is not None:
+            self.feature.unmarked = ""
+            self._report_changes_made()
+
+    def _feature_edit_unmarked(self):
+        if self.feature is None or self.flex_data is None:
             return
-        if hasattr(parent, "delete_feature"):
-            parent.delete_feature(self.feature)
-            self._mark_dirty()
-            self._show_rule_in_web_page()
+        features_to_show = []
+        for ff in self.flex_data.target_data.features_without_variables:
+            if ff.name == self.feature.label:
+                features_to_show.append(ff)
+                break
+        if features_to_show:
+            self._launch_feature_value_chooser(features_to_show, False, True)
+
+    def _feature_delete_ranking(self):
+        if self.feature is not None:
+            self.feature.ranking = 0
+            self.feature.remove_rankings_from_sister_features()
+            self._report_changes_made()
+
+    def _feature_edit_ranking(self):
+        if self.feature is None:
+            return
+        max_rankings = self._get_max_rankings()
+        rankings = [str(i) for i in range(1, max_rankings + 1)]
+        from PyQt6.QtWidgets import QInputDialog
+        current_str = str(self.feature.ranking) if self.feature.ranking > 0 else "1"
+        chosen, ok = QInputDialog.getItem(
+            self, strings.FEATURE_RANKING_HEADER, strings.FEATURE_RANKING_CHOOSE,
+            rankings, rankings.index(current_str) if current_str in rankings else 0, False
+        )
+        if ok:
+            original_ranking = self.feature.ranking
+            new_ranking = int(chosen)
+            self.feature.ranking = new_ranking
+            self.feature.swap_ranking_of_sister_feature_with_ranking(new_ranking, original_ranking)
+            self.feature.assign_rankings_to_sister_features_without_a_ranking(max_rankings)
+            self._report_changes_made()
 
     # ------------------------------------------------------------------
     # Affix context menu handlers
@@ -853,86 +870,85 @@ class RuleGeneratorControl(QMainWindow):
     def _affix_insert_feature(self):
         if self.affix is None or self.flex_data is None:
             return
-        word = self._get_parent_word_for_affix()
-        if word is None:
-            return
-        phrase = self._find_phrase_for_word(word)
-        if phrase is None:
-            return
-        features = self._get_features_for_phrase(phrase)
-        result = self._launch_feature_chooser(features)
-        if result is not None:
-            label, match = result
-            self.affix.insert_new_feature(label, match)
-            self._mark_dirty()
-            self._show_rule_in_web_page()
+        self.affix.insert_new_feature("", "")
+        self.feature = self.affix.features[-1]
+        self.feature.parent = self.affix
+        self._process_insert_feature(True)
+        self._report_changes_made()
 
     def _affix_delete(self):
-        word = self._get_parent_word_for_affix()
-        if word is None or self.affix is None:
+        self.word = self._get_parent_word_for_affix()
+        if self.word is None or self.affix is None:
             return
-        index = self._affix_index_in_word(word)
+        index = self._affix_index_in_word(self.word)
         if index < 0:
             return
-        word.delete_affix_at(index)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self.word.delete_affix_at(index)
+        self._report_changes_made()
 
     def _affix_duplicate(self):
-        word = self._get_parent_word_for_affix()
-        if word is None or self.affix is None:
+        self.word = self._get_parent_word_for_affix()
+        if self.word is None or self.affix is None:
             return
-        index = self._affix_index_in_word(word)
+        index = self._affix_index_in_word(self.word)
         if index < 0:
             return
         dup = self.affix.duplicate()
-        word.insert_affix_at(dup, index)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self.word.insert_affix_at(dup, index)
+        self._report_changes_made()
+
+    def _affix_toggle_type(self):
+        if self.affix is None:
+            return
+        if self.affix.type == AffixType.PREFIX:
+            self.affix.type = AffixType.SUFFIX
+        else:
+            self.affix.type = AffixType.PREFIX
+        self._report_changes_made()
 
     def _affix_insert_prefix_before(self):
-        word = self._get_parent_word_for_affix()
-        if word is None or self.affix is None:
+        self.word = self._get_parent_word_for_affix()
+        if self.word is None or self.affix is None:
             return
-        index = self._affix_index_in_word(word)
+        index = self._affix_index_in_word(self.word)
         if index < 0:
             return
-        word.insert_new_affix_at(AffixType.PREFIX, index)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self._insert_new_affix(index, AffixType.PREFIX)
 
     def _affix_insert_prefix_after(self):
-        word = self._get_parent_word_for_affix()
-        if word is None or self.affix is None:
+        self.word = self._get_parent_word_for_affix()
+        if self.word is None or self.affix is None:
             return
-        index = self._affix_index_in_word(word)
+        index = self._affix_index_in_word(self.word)
         if index < 0:
             return
-        word.insert_new_affix_at(AffixType.PREFIX, index + 1)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self._insert_new_affix(min(len(self.word.affixes), index + 1), AffixType.PREFIX)
 
     def _affix_insert_suffix_before(self):
-        word = self._get_parent_word_for_affix()
-        if word is None or self.affix is None:
+        self.word = self._get_parent_word_for_affix()
+        if self.word is None or self.affix is None:
             return
-        index = self._affix_index_in_word(word)
+        index = self._affix_index_in_word(self.word)
         if index < 0:
             return
-        word.insert_new_affix_at(AffixType.SUFFIX, index)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self._insert_new_affix(index, AffixType.SUFFIX)
 
     def _affix_insert_suffix_after(self):
-        word = self._get_parent_word_for_affix()
-        if word is None or self.affix is None:
+        self.word = self._get_parent_word_for_affix()
+        if self.word is None or self.affix is None:
             return
-        index = self._affix_index_in_word(word)
+        index = self._affix_index_in_word(self.word)
         if index < 0:
             return
-        word.insert_new_affix_at(AffixType.SUFFIX, index + 1)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        self._insert_new_affix(min(len(self.word.affixes), index + 1), AffixType.SUFFIX)
+
+    def _insert_new_affix(self, index: int, affix_type: AffixType):
+        new_affix = Affix()
+        self.word = self._get_parent_word_for_affix()
+        if self.word is not None:
+            self.word.insert_affix_at(new_affix, index)
+            new_affix.type = affix_type
+            self._report_changes_made()
 
     def _affix_move_left(self):
         word = self._get_parent_word_for_affix()
@@ -941,9 +957,8 @@ class RuleGeneratorControl(QMainWindow):
         index = self._affix_index_in_word(word)
         if index <= 0:
             return
-        word.swap_position_of_affixes(index, index - 1)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        word.affixes[index], word.affixes[index - 1] = word.affixes[index - 1], word.affixes[index]
+        self._report_changes_made()
 
     def _affix_move_right(self):
         word = self._get_parent_word_for_affix()
@@ -952,65 +967,94 @@ class RuleGeneratorControl(QMainWindow):
         index = self._affix_index_in_word(word)
         if index < 0 or index >= len(word.affixes) - 1:
             return
-        word.swap_position_of_affixes(index, index + 1)
-        self._mark_dirty()
-        self._show_rule_in_web_page()
+        word.affixes[index], word.affixes[index + 1] = word.affixes[index + 1], word.affixes[index]
+        self._report_changes_made()
 
     # ------------------------------------------------------------------
     # Dialog launchers
     # ------------------------------------------------------------------
 
-    def _launch_category_chooser(self, categories) -> Optional[object]:
+    def _launch_category_chooser(self, categories):
         chooser = CategoryChooser(categories, self)
         if self.category and self.category.name:
             for i, cat in enumerate(categories):
                 if cat.abbreviation == self.category.name:
                     chooser.select_category(i)
                     break
-        if chooser.exec() == QDialog.Accepted and chooser.selected_category:
-            return chooser.selected_category
-        return None
+        if chooser.exec() == QDialog.DialogCode.Accepted and chooser.selected_category:
+            cat = chooser.selected_category
+            self.category.name = cat.abbreviation
+            self.word = self._find_word_for_category()
+            if self.word is not None:
+                self.word.category = cat.abbreviation
+            self._report_changes_made()
 
-    def _launch_feature_chooser(self, features, current_label: str = "", current_match: str = ""):
-        """Show the two-step feature chooser: first pick a feature, then a value.
+    def _process_insert_feature(self, inserting: bool):
+        phrase = self.feature.get_phrase()
+        if phrase is None:
+            return
+        rule = phrase.parent
+        if rule is None:
+            return
+        if self.word is None:
+            if isinstance(self.feature.parent, Word):
+                self.word = self.feature.parent
+            elif isinstance(self.feature.parent, Affix):
+                affix = self.feature.parent
+                self.word = affix.parent
+        cat = self.word.get_category_of_word_or_corresponding_source_word()
+        flex_categories = self.flex_data.get_flex_categories_for_phrase(phrase.type)
+        features_in_use = phrase.get_features_in_use_for_category(flex_categories, cat)
+        features_to_show = list(features_in_use)
+        features_for_category = self.flex_data.get_features_in_phrase_for_category(phrase.type, cat)
+        self._add_any_disjoint_features(features_to_show, features_for_category)
+        features_to_show.extend(features_for_category)
+        self._launch_feature_value_chooser(features_to_show, inserting, False)
 
-        Returns (label, match) tuple or None if cancelled.
-        """
-        if not features:
-            return None
+    def _add_any_disjoint_features(self, features_to_show: list, features_for_category: list):
+        if self.rule_generator is None:
+            return
+        for df_set in self.rule_generator.disjoint_feature_sets:
+            if df_set.has_flex_feature_in_list(features_for_category):
+                ff = FLExFeature(df_set.name)
+                from flextrans_rule_generator.flex_model.flex_feature_value import GREEK_VARIABLES
+                for i in range(min(self.max_variables, len(GREEK_VARIABLES))):
+                    var_value = FLExFeatureValue(GREEK_VARIABLES[i])
+                    var_value.feature = ff
+                    ff.values.append(var_value)
+                features_to_show.append(ff)
 
-        # Step 1 -- choose the feature
+    def _launch_feature_value_chooser(self, features: list, inserting: bool, unmarked: bool):
         from flextrans_rule_generator.controller.feature_value_chooser import FeatureValueChooser
-
         chooser = FeatureValueChooser(self)
         chooser.setWindowTitle(strings.FEATURE_CHOOSER_TITLE)
-        chooser.list_widget.clear()
-        for feat in features:
-            chooser.list_widget.addItem(str(feat))
-        # pre-select current feature if editing
-        if current_label:
-            for i, feat in enumerate(features):
-                if feat.name == current_label:
-                    chooser.select_feature_value(i)
-                    break
-        if chooser.exec() != QDialog.Accepted:
-            return None
-        row = chooser.list_widget.currentRow()
-        if row < 0 or row >= len(features):
-            return None
-        selected_feature = features[row]
-
-        # Step 2 -- choose the value
-        value_chooser = FeatureValueChooser(self)
-        value_chooser.max_variables = self.max_variables
-        value_chooser.feature_values = list(selected_feature.values)
-        value_chooser.create_variable_values(selected_feature)
-        value_chooser.fill_feature_values_list()
-        if current_label and current_match:
-            value_chooser.find_and_select_feature_value_pair(current_label, current_match)
-        if value_chooser.exec() == QDialog.Accepted and value_chooser.selected_feature_value:
-            return (selected_feature.name, value_chooser.match)
-        return None
+        chooser.set_features(features)
+        chooser.select_flex_feature_value(self.feature)
+        chooser.show_unmarked_label(unmarked)
+        if chooser.exec() == QDialog.DialogCode.Accepted:
+            feat_value = chooser.get_feature_value_chosen()
+            if feat_value is not None:
+                if unmarked:
+                    self.feature.unmarked = feat_value.abbreviation
+                else:
+                    self.feature.label = feat_value.feature.name if feat_value.feature else ""
+                    if FLExFeatureValue.is_greek(feat_value.abbreviation):
+                        self.feature.match = feat_value.abbreviation
+                        self.feature.value = ""
+                    else:
+                        self.feature.match = ""
+                        self.feature.value = feat_value.abbreviation
+                if self.feature.sister_feature_has_a_ranking():
+                    max_rankings = self._get_max_rankings()
+                    self.feature.assign_rankings_to_sister_features_without_a_ranking(max_rankings)
+                self._report_changes_made()
+        elif inserting:
+            # Undo addition of this feature
+            rc = self.feature.parent
+            if isinstance(rc, Word):
+                self.word.delete_feature(self.feature)
+            elif isinstance(rc, Affix):
+                self.affix.delete_feature(self.feature)
 
     # ------------------------------------------------------------------
     # Helpers: find phrase / categories / features for a constituent
@@ -1054,47 +1098,103 @@ class RuleGeneratorControl(QMainWindow):
             return self.flex_data.source_data.features
         return self.flex_data.target_data.features
 
+    def _flex_category_has_valid_features(self, flex_categories) -> bool:
+        cat = self.word.get_category_of_word_or_corresponding_source_word()
+        if cat is None:
+            return False
+        s_cat = cat.name
+        for fc in flex_categories:
+            if fc.abbreviation == s_cat:
+                return len(fc.valid_features) > 0
+        return False
+
+    def _get_max_rankings(self) -> int:
+        self.word = self.feature.get_word()
+        cat = self.word.get_category_of_word_or_corresponding_source_word()
+        return self._calculate_max_rankings(cat)
+
+    def _calculate_max_rankings(self, cat) -> int:
+        max_rankings = 0
+        phrase = self.feature.get_phrase()
+        if phrase is not None and phrase.type == PhraseType.TARGET:
+            flex_features = self.flex_data.target_data.get_features_for_category(cat)
+        else:
+            flex_features = self.flex_data.source_data.get_features_for_category(cat)
+        max_rankings = len(flex_features)
+        if self.rule_generator:
+            for feature_set in self.rule_generator.disjoint_feature_sets:
+                if feature_set.has_flex_feature_in_list(flex_features):
+                    max_rankings += 1
+        return max_rankings
+
+    def _is_ok_to_show_disjoint_features_editor(self) -> bool:
+        if self.flex_data is None:
+            return False
+        for f in self.flex_data.target_data.features:
+            if f.name == strings.DISJOINT_NUMBER:
+                has_sg = any(v.abbreviation == strings.DISJOINT_SG for v in f.values)
+                has_pl = any(v.abbreviation == strings.DISJOINT_PL for v in f.values)
+                if has_sg and has_pl:
+                    return True
+        return False
+
+    def _enable_disable_create_permutations(self, rule):
+        """Enable/disable create permutations combo based on rule state."""
+        if rule is None:
+            return
+        # Java enables this when target phrase has > 1 word and one is marked as head
+        target_phrase = rule.target.phrase
+        has_head = any(w.head == HeadValue.YES for w in target_phrase.words)
+        has_multiple_words = len(target_phrase.words) > 1
+        self.create_permutations_combo.setEnabled(has_head and has_multiple_words)
+
     # ------------------------------------------------------------------
     # Context menu enable/disable adjustment
     # ------------------------------------------------------------------
 
     def _adjust_rule_context_menu(self, index: int):
-        """Enable/disable rule menu items based on current position."""
         if not self.rule_generator:
             return
         count = len(self.rule_generator.rules)
-        index_last = count - 1
         self.rule_act_move_up.setEnabled(index > 0)
-        self.rule_act_move_down.setEnabled(index < index_last)
-        self.rule_act_delete.setEnabled(not (index == 0 and index_last == 0))
+        self.rule_act_move_down.setEnabled(index < count - 1)
 
     def _adjust_word_context_menu(self):
-        """Enable/disable word menu items based on current word state."""
         if self.word is None:
             return
         phrase = self._get_parent_phrase()
         if phrase is None:
             return
+        phrase_type = phrase.type
         index = self._word_index_in_phrase(phrase)
         if index < 0:
             return
         index_last = len(phrase.words) - 1
         self.word_act_move_left.setEnabled(index > 0)
         self.word_act_move_right.setEnabled(index < index_last)
-        # Only allow insert prefix/suffix if no affixes yet
+        self.word_act_delete.setEnabled(not (index == 0 and index_last == 0))
+        # Category: disable if word already has a category
+        cat = self.word.get_category_of_word_or_corresponding_source_word()
+        self.word_act_insert_category.setEnabled(cat is None or len(cat.name) == 0)
+        # Head marking: only on target words
+        if phrase_type == PhraseType.SOURCE:
+            self.word_act_mark_as_head.setEnabled(False)
+            self.word_act_remove_head_marking.setEnabled(False)
+        else:
+            self.word_act_mark_as_head.setEnabled(self.word.head != HeadValue.YES)
+            self.word_act_remove_head_marking.setEnabled(self.word.head == HeadValue.YES)
+        # Prefix/suffix: only if no affixes yet
         has_affixes = len(self.word.affixes) > 0
         self.word_act_insert_prefix.setEnabled(not has_affixes)
         self.word_act_insert_suffix.setEnabled(not has_affixes)
-        # Only allow insert category if no category yet
-        self.word_act_insert_category.setEnabled(not self.word.category)
-        # Only allow insert feature if no features yet
-        self.word_act_insert_feature.setEnabled(len(self.word.features) == 0)
-        # Head marking toggles
-        self.word_act_mark_as_head.setEnabled(self.word.head == HeadValue.NO)
-        self.word_act_remove_head_marking.setEnabled(self.word.head == HeadValue.YES)
+        # Feature: enable based on valid features for category
+        if self.flex_data:
+            flex_categories = self.flex_data.get_flex_categories_for_phrase(phrase_type)
+            self.word_act_insert_feature.setEnabled(self._flex_category_has_valid_features(flex_categories))
+        else:
+            self.word_act_insert_feature.setEnabled(False)
 
     def _adjust_affix_context_menu(self):
-        """Enable/disable affix menu items based on current affix position."""
         if self.affix is None:
             return
         word = self._get_parent_word_for_affix()
@@ -1106,9 +1206,39 @@ class RuleGeneratorControl(QMainWindow):
         index_last = len(word.affixes) - 1
         self.affix_act_move_left.setEnabled(index > 0)
         self.affix_act_move_right.setEnabled(index < index_last)
+        # Insert feature: enable based on valid features
+        if self.flex_data:
+            phrase = self._find_phrase_for_word(word)
+            if phrase:
+                flex_categories = self.flex_data.get_flex_categories_for_phrase(phrase.type)
+                self.affix_act_insert_feature.setEnabled(self._flex_category_has_valid_features(flex_categories))
+            else:
+                self.affix_act_insert_feature.setEnabled(False)
+        else:
+            self.affix_act_insert_feature.setEnabled(False)
+
+    def _adjust_feature_context_menu(self):
+        if self.feature is None:
+            return
+        this_word = Word()
+        rc = self.feature.parent
+        if isinstance(rc, Word):
+            this_word = rc
+        elif isinstance(rc, Affix):
+            rc2 = rc.parent
+            if isinstance(rc2, Word):
+                this_word = rc2
+        phrase = this_word.parent
+        if phrase is not None and isinstance(phrase, Phrase) and phrase.type == PhraseType.TARGET:
+            self.feature_act_edit_ranking.setEnabled(this_word.has_more_than_one_feature())
+        else:
+            self.feature_act_edit_ranking.setEnabled(False)
+        self.feature_act_edit_unmarked.setEnabled(True)
+        self.feature_act_delete_unmarked.setEnabled(len(self.feature.unmarked) > 0)
+        self.feature_act_delete_ranking.setEnabled(self.feature.ranking > 0)
 
     # ------------------------------------------------------------------
-    # Dirty tracking / save
+    # Dirty tracking / save / report changes
     # ------------------------------------------------------------------
 
     def _mark_dirty(self):
@@ -1121,11 +1251,59 @@ class RuleGeneratorControl(QMainWindow):
             title += "*"
         self.setWindowTitle(title)
 
+    def _report_changes_made(self):
+        self._show_rule_in_web_page()
+        self._mark_dirty()
+
     def _save(self):
         if self.provider and self.rule_file_path:
             self.provider.save_data_to_file(self.rule_file_path)
             self._is_dirty = False
             self._show_change_status_on_form()
+
+    # ------------------------------------------------------------------
+    # Validity checking
+    # ------------------------------------------------------------------
+
+    def _rule_is_valid(self, rule: FLExTransRule) -> bool:
+        checker = ValidityChecker()
+        checker.rule = rule
+        if not checker.check_source_words_have_categories():
+            self._show_validity_message(
+                strings.VALIDITY_CATEGORY.format(rule.name),
+                strings.VALIDITY_SOURCE_WORD_MISSING_CATEGORY,
+            )
+            return False
+        if not checker.check_target_has_feature():
+            self._show_validity_message(
+                strings.VALIDITY_FEATURE.format(rule.name),
+                strings.VALIDITY_NO_FEATURES,
+            )
+            return False
+        if not checker.check_target_word_marked_as_head():
+            self._show_validity_message(
+                strings.VALIDITY_HEAD.format(rule.name),
+                strings.VALIDITY_NO_HEAD,
+            )
+            return False
+        return True
+
+    def _show_validity_message(self, header_text: str, content: str):
+        QMessageBox.critical(self, strings.VALIDITY_HEADER, f"{header_text}\n\n{content}")
+
+    def _check_validity_of_all_rules(self) -> bool:
+        if not self.rule_generator:
+            return True
+        for rule in self.rule_generator.rules:
+            if not self._rule_is_valid(rule):
+                return False
+        return True
+
+    def _save_and_exit_if_valid(self, exit_code: str, is_valid: bool):
+        self._save()
+        if is_valid:
+            self.exit_code = exit_code
+            self.close()
 
     # ------------------------------------------------------------------
     # Toolbar button handlers
@@ -1140,16 +1318,16 @@ class RuleGeneratorControl(QMainWindow):
         self._save()
 
     def _on_save_and_write(self):
-        self._save()
         rule_index = self._current_rule_index()
-        if rule_index >= 0:
-            self.exit_code = f"1 {rule_index}"
-        self.close()
+        if rule_index < 0:
+            return
+        rule = self.rule_generator.rules[rule_index]
+        is_valid = self._rule_is_valid(rule)
+        self._save_and_exit_if_valid(f"1 {rule_index}", is_valid)
 
     def _on_save_and_write_all(self):
-        self._save()
-        self.exit_code = "2"
-        self.close()
+        is_valid = self._check_validity_of_all_rules()
+        self._save_and_exit_if_valid("2", is_valid)
 
     def _on_help(self):
         QMessageBox.information(
