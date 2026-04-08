@@ -443,9 +443,9 @@ def StartRuleAssistant(report, ruleAssistantFile, ruleAssistGUIinputfile,
 
     # Call the Rule Assistant PyQt6 window (in-process)
     try:
-        # Add src-py to path for module import
+        # Add src_py to path for module import
         import sys
-        src_py_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src-py')
+        src_py_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src_py')
         if src_py_path not in sys.path:
             sys.path.insert(0, src_py_path)
 
