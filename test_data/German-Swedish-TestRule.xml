@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE FLExTransRuleGenerator PUBLIC " -//XMLmind//DTD FLExTransRuleGenerator//EN"
+"FLExTransRuleGenerator.dtd">
+<FLExTransRuleGenerator overwrite_rules="no">
+  <FLExTransRules>
+    <FLExTransRule name="German-noun-to-Swedish-noun" create_permutations="with_head">
+      <Description>Simple noun transformation with gender and number agreement</Description>
+      <Source>
+        <Phrase>
+          <Words>
+            <Word id="1" category="n" head="yes">
+              <Features>
+                <Feature label="gender" match="" value="m" unmarked_default="" ranking="0" />
+                <Feature label="number" match="" value="sg" unmarked_default="" ranking="0" />
+              </Features>
+            </Word>
+          </Words>
+        </Phrase>
+      </Source>
+      <Target>
+        <Phrase>
+          <Words>
+            <Word id="1" category="n" head="yes">
+              <Features>
+                <Feature label="gender" match="" value="com" unmarked_default="" ranking="0" />
+                <Feature label="number" match="" value="sg" unmarked_default="" ranking="0" />
+              </Features>
+            </Word>
+          </Words>
+        </Phrase>
+      </Target>
+    </FLExTransRule>
+  </FLExTransRules>
+</FLExTransRuleGenerator>

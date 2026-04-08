@@ -1,0 +1,94 @@
+<?xml version='1.0' encoding='utf-8'?>
+<FLExData>
+  <SourceData name="German-FLExTrans-Sample">
+    <Categories>
+      <FLExCategory abbr="adv" />
+      <FLExCategory abbr="def">
+        <ValidFeatures>
+          <ValidFeature name="definiteness" type="prefix|stem|suffix" />
+          <ValidFeature name="gender" type="prefix|stem|suffix" />
+          <ValidFeature name="number" type="prefix|stem|suffix" />
+        </ValidFeatures>
+      </FLExCategory>
+      <FLExCategory abbr="indf">
+        <ValidFeatures>
+          <ValidFeature name="definiteness" type="prefix|stem|suffix" />
+          <ValidFeature name="gender" type="prefix|stem|suffix" />
+          <ValidFeature name="number" type="prefix|stem|suffix" />
+        </ValidFeatures>
+      </FLExCategory>
+      <FLExCategory abbr="n">
+        <ValidFeatures>
+          <ValidFeature name="definiteness" type="prefix|suffix" />
+          <ValidFeature name="gender" type="prefix|stem|suffix" />
+          <ValidFeature name="number" type="prefix|suffix" />
+        </ValidFeatures>
+      </FLExCategory>
+      <FLExCategory abbr="nprop" />
+      <FLExCategory abbr="pro" />
+      <FLExCategory abbr="v" />
+    </Categories>
+    <Features>
+      <FLExFeature name="definiteness">
+        <Values>
+          <FLExFeatureValue abbr="defid" />
+          <FLExFeatureValue abbr="indfid" />
+        </Values>
+      </FLExFeature>
+      <FLExFeature name="gender">
+        <Values>
+          <FLExFeatureValue abbr="f" />
+          <FLExFeatureValue abbr="m" />
+          <FLExFeatureValue abbr="neut" />
+        </Values>
+      </FLExFeature>
+      <FLExFeature name="number">
+        <Values>
+          <FLExFeatureValue abbr="pl" />
+          <FLExFeatureValue abbr="sg" />
+        </Values>
+      </FLExFeature>
+    </Features>
+  </SourceData>
+  <TargetData name="Swedish-FLExTrans-Sample">
+    <Categories>
+      <FLExCategory abbr="adv" />
+      <FLExCategory abbr="indf">
+        <ValidFeatures>
+          <ValidFeature name="definiteness" type="prefix|stem|suffix" />
+          <ValidFeature name="gender" type="prefix|stem|suffix" />
+          <ValidFeature name="number" type="prefix|stem|suffix" />
+        </ValidFeatures>
+      </FLExCategory>
+      <FLExCategory abbr="n">
+        <ValidFeatures>
+          <ValidFeature name="definiteness" type="prefix|suffix" />
+          <ValidFeature name="gender" type="prefix|stem|suffix" />
+          <ValidFeature name="number" type="prefix|suffix" />
+        </ValidFeatures>
+      </FLExCategory>
+      <FLExCategory abbr="pro" />
+      <FLExCategory abbr="v" />
+    </Categories>
+    <Features>
+      <FLExFeature name="definiteness">
+        <Values>
+          <FLExFeatureValue abbr="defid" />
+          <FLExFeatureValue abbr="indfid" />
+        </Values>
+      </FLExFeature>
+      <FLExFeature name="gender">
+        <Values>
+          <FLExFeatureValue abbr="com" />
+          <FLExFeatureValue abbr="neut" />
+        </Values>
+      </FLExFeature>
+      <FLExFeature name="number">
+        <Values>
+          <FLExFeatureValue abbr="pl" />
+          <FLExFeatureValue abbr="sg" />
+        </Values>
+      </FLExFeature>
+    </Features>
+  </TargetData>
+</FLExData>
