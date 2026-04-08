@@ -627,11 +627,11 @@ class RuleAssistantWindow(QMainWindow):
             if self._generator:
                 rule = self._generator.flex_trans_rules[self._current_rule_index]
                 # Find and update source
-                for word in rule.source.phrase.words:
+                for word in rule.source.words:
                     if word.word_id == old_id:
                         word.word_id = new_id
                 # Find and update target
-                for word in rule.target.phrase.words:
+                for word in rule.target.words:
                     if word.word_id == old_id:
                         word.word_id = new_id
             self._mark_dirty()
@@ -1215,10 +1215,10 @@ class RuleAssistantWindow(QMainWindow):
         Returns:
             The Phrase containing the word, or None
         """
-        if word in rule.source.phrase.words:
-            return rule.source.phrase
-        if word in rule.target.phrase.words:
-            return rule.target.phrase
+        if word in rule.source.words:
+            return rule.source
+        if word in rule.target.words:
+            return rule.target
         return None
 
     def _find_and_remove_feature(self, rule, feature) -> None:
@@ -1228,7 +1228,7 @@ class RuleAssistantWindow(QMainWindow):
             rule: The current FLExTransRule
             feature: The Feature to remove
         """
-        for word in rule.source.phrase.words + rule.target.phrase.words:
+        for word in rule.source.words + rule.target.words:
             if feature in word.features:
                 word.features.remove(feature)
                 return
@@ -1244,7 +1244,7 @@ class RuleAssistantWindow(QMainWindow):
             rule: The current FLExTransRule
             category: The Category to clear
         """
-        for word in rule.source.phrase.words + rule.target.phrase.words:
+        for word in rule.source.words + rule.target.words:
             # Compare by name since category objects may not be the same instance
             if word.category_constituent and word.category_constituent.name == category.name:
                 word.word_category = ""
