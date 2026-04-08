@@ -26,6 +26,9 @@ from ..service.validity_checker import ValidityChecker
 from ..service.web_page_producer import WebPageProducer
 from ..service.web_page_interactor import WebPageInteractor
 from ..service.application_preferences import ApplicationPreferences
+from .category_chooser import CategoryChooserDialog
+from .feature_value_chooser import FeatureValueChooserDialog
+from .disjoint_features_editor import DisjointFeaturesEditorDialog
 
 
 class WindowResult(NamedTuple):
@@ -574,7 +577,14 @@ class RuleAssistantWindow(QMainWindow):
 
     def _on_disjoint_features(self) -> None:
         """Handle Disjoint Features button."""
-        QMessageBox.information(self, "Disjoint Features", "Not yet implemented")
+        if not self._generator or not self._flex_data:
+            QMessageBox.warning(self, "Error", "No data loaded")
+            return
+
+        dialog = DisjointFeaturesEditorDialog(self._generator, self._flex_data, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._mark_dirty()
+            self._refresh_rule_view()
 
     def _on_rule_list_context_menu(self, pos: QPoint) -> None:
         """Handle rule list context menu."""
@@ -585,161 +595,528 @@ class RuleAssistantWindow(QMainWindow):
     # Word menu handlers
     def _on_word_duplicate(self) -> None:
         """Duplicate selected word."""
-        # TODO: Implement
-        pass
+        if not self._selected_word or not self._generator:
+            return
+
+        from copy import deepcopy
+        phrase = self._find_phrase_containing_word(
+            self._generator.flex_trans_rules[self._current_rule_index],
+            self._selected_word
+        )
+        if not phrase:
+            return
+
+        index = phrase.words.index(self._selected_word)
+        new_word = deepcopy(self._selected_word)
+        phrase.words.insert(index + 1, new_word)
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_word_change_number(self) -> None:
         """Change selected word's number."""
-        # TODO: Implement
-        pass
+        if not self._selected_word:
+            return
+
+        new_id, ok = QInputDialog.getText(
+            self, "Change Word Number",
+            "Enter new word number:",
+            text=self._selected_word.word_id
+        )
+        if ok and new_id:
+            old_id = self._selected_word.word_id
+            # Update in both source and target phrases
+            if self._generator:
+                rule = self._generator.flex_trans_rules[self._current_rule_index]
+                # Find and update source
+                for word in rule.source.phrase.words:
+                    if word.word_id == old_id:
+                        word.word_id = new_id
+                # Find and update target
+                for word in rule.target.phrase.words:
+                    if word.word_id == old_id:
+                        word.word_id = new_id
+            self._mark_dirty()
+            self._refresh_rule_view()
 
     def _on_word_mark_as_head(self) -> None:
         """Mark selected word as head."""
-        # TODO: Implement
-        pass
+        if not self._selected_word or not self._generator:
+            return
+
+        phrase = self._find_phrase_containing_word(
+            self._generator.flex_trans_rules[self._current_rule_index],
+            self._selected_word
+        )
+        if phrase:
+            phrase.mark_word_as_head(self._selected_word)
+            self._mark_dirty()
+            self._refresh_rule_view()
 
     def _on_word_remove_head(self) -> None:
         """Remove head marking from selected word."""
-        # TODO: Implement
-        pass
+        if not self._selected_word:
+            return
+
+        from ..model.enums import HeadValue
+        self._selected_word.head = HeadValue.no
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_word_insert_before(self) -> None:
         """Insert word before selected word."""
-        # TODO: Implement
-        pass
+        if not self._selected_word or not self._generator:
+            return
+
+        phrase = self._find_phrase_containing_word(
+            self._generator.flex_trans_rules[self._current_rule_index],
+            self._selected_word
+        )
+        if not phrase:
+            return
+
+        index = phrase.words.index(self._selected_word)
+        phrase.insert_new_word_at(index)
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_word_insert_after(self) -> None:
         """Insert word after selected word."""
-        # TODO: Implement
-        pass
+        if not self._selected_word or not self._generator:
+            return
+
+        phrase = self._find_phrase_containing_word(
+            self._generator.flex_trans_rules[self._current_rule_index],
+            self._selected_word
+        )
+        if not phrase:
+            return
+
+        index = phrase.words.index(self._selected_word)
+        phrase.insert_new_word_at(index + 1)
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_word_insert_prefix(self) -> None:
         """Insert prefix on selected word."""
-        # TODO: Implement
-        pass
+        if not self._selected_word:
+            return
+
+        from ..model.affix import Affix
+        from ..model.enums import AffixType
+        new_affix = Affix(affix_type=AffixType.prefix)
+        self._selected_word.affixes.append(new_affix)
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_word_insert_suffix(self) -> None:
         """Insert suffix on selected word."""
-        # TODO: Implement
-        pass
+        if not self._selected_word:
+            return
+
+        from ..model.affix import Affix
+        from ..model.enums import AffixType
+        new_affix = Affix(affix_type=AffixType.suffix)
+        self._selected_word.affixes.append(new_affix)
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_word_insert_category(self) -> None:
         """Insert category on selected word."""
-        # TODO: Implement
-        pass
+        if not self._selected_word or not self._flex_data:
+            return
+
+        # Get all available categories
+        all_categories = []
+        if self._flex_data.source_data:
+            all_categories.extend(self._flex_data.source_data.categories)
+        if self._flex_data.target_data:
+            all_categories.extend(self._flex_data.target_data.categories)
+
+        # Remove duplicates and sort
+        seen = set()
+        unique_categories = []
+        for cat in all_categories:
+            if cat.abbreviation not in seen:
+                unique_categories.append(cat)
+                seen.add(cat.abbreviation)
+
+        if not unique_categories:
+            QMessageBox.warning(self, "Error", "No categories available")
+            return
+
+        # Get current category for pre-selection
+        from ..model.category import Category
+        current_category = Category(name=self._selected_word.word_category) if self._selected_word.word_category else None
+
+        dialog = CategoryChooserDialog(unique_categories, current_category, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            chosen = dialog.get_chosen_category()
+            if chosen:
+                self._selected_word.word_category = chosen.abbreviation
+                self._selected_word.category_constituent = Category(name=chosen.abbreviation)
+                self._mark_dirty()
+                self._refresh_rule_view()
 
     def _on_word_insert_feature(self) -> None:
         """Insert feature on selected word."""
-        # TODO: Implement
-        pass
+        if not self._selected_word or not self._flex_data:
+            return
+
+        # Get all available features
+        all_features = []
+        if self._flex_data.source_data:
+            all_features.extend(self._flex_data.source_data.features)
+        if self._flex_data.target_data:
+            all_features.extend(self._flex_data.target_data.features)
+
+        if not all_features:
+            QMessageBox.warning(self, "Error", "No features available")
+            return
+
+        dialog = FeatureValueChooserDialog(all_features, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            result = dialog.get_chosen_value()
+            if result:
+                flex_feature, flex_value = result
+                from ..model.feature import Feature
+                new_feature = Feature(
+                    label=flex_feature.name,
+                    value=flex_value.abbreviation
+                )
+                self._selected_word.features.append(new_feature)
+                self._mark_dirty()
+                self._refresh_rule_view()
 
     def _on_word_move_left(self) -> None:
         """Move selected word left."""
-        # TODO: Implement
-        pass
+        if not self._selected_word or not self._generator:
+            return
+
+        phrase = self._find_phrase_containing_word(
+            self._generator.flex_trans_rules[self._current_rule_index],
+            self._selected_word
+        )
+        if not phrase:
+            return
+
+        index = phrase.words.index(self._selected_word)
+        if index > 0:
+            phrase.swap_position_of_words(index, index - 1)
+            self._mark_dirty()
+            self._refresh_rule_view()
 
     def _on_word_move_right(self) -> None:
         """Move selected word right."""
-        # TODO: Implement
-        pass
+        if not self._selected_word or not self._generator:
+            return
+
+        phrase = self._find_phrase_containing_word(
+            self._generator.flex_trans_rules[self._current_rule_index],
+            self._selected_word
+        )
+        if not phrase:
+            return
+
+        index = phrase.words.index(self._selected_word)
+        if index < len(phrase.words) - 1:
+            phrase.swap_position_of_words(index, index + 1)
+            self._mark_dirty()
+            self._refresh_rule_view()
 
     def _on_word_delete(self) -> None:
         """Delete selected word."""
-        # TODO: Implement
-        pass
+        if not self._selected_word or not self._generator:
+            return
+
+        phrase = self._find_phrase_containing_word(
+            self._generator.flex_trans_rules[self._current_rule_index],
+            self._selected_word
+        )
+        if phrase:
+            index = phrase.words.index(self._selected_word)
+            phrase.words.pop(index)
+            self._mark_dirty()
+            self._refresh_rule_view()
 
     # Category menu handlers
     def _on_category_edit(self) -> None:
         """Edit selected category."""
-        # TODO: Implement
-        pass
+        if not self._selected_category or not self._flex_data:
+            return
+
+        # Get all available categories
+        all_categories = []
+        if self._flex_data.source_data:
+            all_categories.extend(self._flex_data.source_data.categories)
+        if self._flex_data.target_data:
+            all_categories.extend(self._flex_data.target_data.categories)
+
+        # Remove duplicates
+        seen = set()
+        unique_categories = []
+        for cat in all_categories:
+            if cat.abbreviation not in seen:
+                unique_categories.append(cat)
+                seen.add(cat.abbreviation)
+
+        if not unique_categories:
+            return
+
+        from ..model.category import Category
+        current_category = Category(name=self._selected_category.name) if self._selected_category.name else None
+
+        dialog = CategoryChooserDialog(unique_categories, current_category, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            chosen = dialog.get_chosen_category()
+            if chosen:
+                self._selected_category.name = chosen.abbreviation
+                self._mark_dirty()
+                self._refresh_rule_view()
 
     def _on_category_delete(self) -> None:
         """Delete selected category."""
-        # TODO: Implement
-        pass
+        if not self._selected_category or not self._generator:
+            return
+
+        rule = self._generator.flex_trans_rules[self._current_rule_index]
+        # Find parent word and clear its category
+        self._find_and_clear_category(rule, self._selected_category)
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     # Feature menu handlers
     def _on_feature_edit(self) -> None:
         """Edit selected feature."""
-        # TODO: Implement
-        pass
+        if not self._selected_feature or not self._flex_data:
+            return
+
+        # Get all available features
+        all_features = []
+        if self._flex_data.source_data:
+            all_features.extend(self._flex_data.source_data.features)
+        if self._flex_data.target_data:
+            all_features.extend(self._flex_data.target_data.features)
+
+        if not all_features:
+            return
+
+        from ..model.feature import Feature
+        # Pre-select current feature for dialog
+        current_feature = Feature(
+            label=self._selected_feature.label,
+            value=self._selected_feature.value
+        ) if self._selected_feature.label else None
+
+        dialog = FeatureValueChooserDialog(all_features, current_feature, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            result = dialog.get_chosen_value()
+            if result:
+                flex_feature, flex_value = result
+                self._selected_feature.label = flex_feature.name
+                self._selected_feature.value = flex_value.abbreviation
+                self._selected_feature.match = ""
+                self._mark_dirty()
+                self._refresh_rule_view()
 
     def _on_feature_edit_unmarked(self) -> None:
         """Edit unmarked value of selected feature."""
-        # TODO: Implement
-        pass
+        if not self._selected_feature:
+            return
+
+        text, ok = QInputDialog.getText(
+            self, "Edit Unmarked Value",
+            "Enter unmarked value:",
+            text=self._selected_feature.unmarked
+        )
+        if ok:
+            self._selected_feature.unmarked = text
+            self._mark_dirty()
+            self._refresh_rule_view()
 
     def _on_feature_edit_ranking(self) -> None:
         """Edit ranking of selected feature."""
-        # TODO: Implement
-        pass
+        if not self._selected_feature:
+            return
+
+        value, ok = QInputDialog.getInt(
+            self, "Edit Ranking",
+            "Enter ranking (0 = no ranking):",
+            self._selected_feature.ranking,
+            0, 9999, 1
+        )
+        if ok:
+            self._selected_feature.ranking = value
+            self._mark_dirty()
+            self._refresh_rule_view()
 
     def _on_feature_delete(self) -> None:
         """Delete selected feature."""
-        # TODO: Implement
-        pass
+        if not self._selected_feature or not self._generator:
+            return
+
+        rule = self._generator.flex_trans_rules[self._current_rule_index]
+        # Find parent word or affix and remove feature
+        self._find_and_remove_feature(rule, self._selected_feature)
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_feature_delete_unmarked(self) -> None:
         """Delete unmarked value from selected feature."""
-        # TODO: Implement
-        pass
+        if not self._selected_feature:
+            return
+        self._selected_feature.unmarked = ""
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_feature_delete_ranking(self) -> None:
         """Delete ranking from selected feature."""
-        # TODO: Implement
-        pass
+        if not self._selected_feature:
+            return
+        self._selected_feature.ranking = 0
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     # Affix menu handlers
     def _on_affix_duplicate(self) -> None:
         """Duplicate selected affix."""
-        # TODO: Implement
-        pass
+        if not self._selected_affix or not self._selected_word:
+            return
+
+        from copy import deepcopy
+        index = self._selected_word.affixes.index(self._selected_affix)
+        new_affix = deepcopy(self._selected_affix)
+        self._selected_word.affixes.insert(index + 1, new_affix)
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_affix_toggle_type(self) -> None:
         """Toggle affix type (prefix <-> suffix)."""
-        # TODO: Implement
-        pass
+        if not self._selected_affix:
+            return
+
+        from ..model.enums import AffixType
+        self._selected_affix.affix_type = (
+            AffixType.suffix if self._selected_affix.affix_type == AffixType.prefix
+            else AffixType.prefix
+        )
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_affix_insert_feature(self) -> None:
         """Insert feature on selected affix."""
-        # TODO: Implement
-        pass
+        if not self._selected_affix or not self._flex_data:
+            return
+
+        # Get all available features
+        all_features = []
+        if self._flex_data.source_data:
+            all_features.extend(self._flex_data.source_data.features)
+        if self._flex_data.target_data:
+            all_features.extend(self._flex_data.target_data.features)
+
+        if not all_features:
+            QMessageBox.warning(self, "Error", "No features available")
+            return
+
+        dialog = FeatureValueChooserDialog(all_features, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            result = dialog.get_chosen_value()
+            if result:
+                flex_feature, flex_value = result
+                from ..model.feature import Feature
+                new_feature = Feature(
+                    label=flex_feature.name,
+                    value=flex_value.abbreviation
+                )
+                self._selected_affix.features.append(new_feature)
+                self._mark_dirty()
+                self._refresh_rule_view()
 
     def _on_affix_insert_prefix_before(self) -> None:
         """Insert prefix before selected affix."""
-        # TODO: Implement
-        pass
+        if not self._selected_affix or not self._selected_word:
+            return
+
+        from ..model.affix import Affix
+        from ..model.enums import AffixType
+        index = self._selected_word.affixes.index(self._selected_affix)
+        new_affix = Affix(affix_type=AffixType.prefix)
+        self._selected_word.affixes.insert(index, new_affix)
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_affix_insert_prefix_after(self) -> None:
         """Insert prefix after selected affix."""
-        # TODO: Implement
-        pass
+        if not self._selected_affix or not self._selected_word:
+            return
+
+        from ..model.affix import Affix
+        from ..model.enums import AffixType
+        index = self._selected_word.affixes.index(self._selected_affix)
+        new_affix = Affix(affix_type=AffixType.prefix)
+        self._selected_word.affixes.insert(index + 1, new_affix)
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_affix_insert_suffix_before(self) -> None:
         """Insert suffix before selected affix."""
-        # TODO: Implement
-        pass
+        if not self._selected_affix or not self._selected_word:
+            return
+
+        from ..model.affix import Affix
+        from ..model.enums import AffixType
+        index = self._selected_word.affixes.index(self._selected_affix)
+        new_affix = Affix(affix_type=AffixType.suffix)
+        self._selected_word.affixes.insert(index, new_affix)
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_affix_insert_suffix_after(self) -> None:
         """Insert suffix after selected affix."""
-        # TODO: Implement
-        pass
+        if not self._selected_affix or not self._selected_word:
+            return
+
+        from ..model.affix import Affix
+        from ..model.enums import AffixType
+        index = self._selected_word.affixes.index(self._selected_affix)
+        new_affix = Affix(affix_type=AffixType.suffix)
+        self._selected_word.affixes.insert(index + 1, new_affix)
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     def _on_affix_move_left(self) -> None:
         """Move selected affix left."""
-        # TODO: Implement
-        pass
+        if not self._selected_affix or not self._selected_word:
+            return
+
+        index = self._selected_word.affixes.index(self._selected_affix)
+        if index > 0:
+            self._selected_word.affixes[index], self._selected_word.affixes[index - 1] = \
+                self._selected_word.affixes[index - 1], self._selected_word.affixes[index]
+            self._mark_dirty()
+            self._refresh_rule_view()
 
     def _on_affix_move_right(self) -> None:
         """Move selected affix right."""
-        # TODO: Implement
-        pass
+        if not self._selected_affix or not self._selected_word:
+            return
+
+        index = self._selected_word.affixes.index(self._selected_affix)
+        if index < len(self._selected_word.affixes) - 1:
+            self._selected_word.affixes[index], self._selected_word.affixes[index + 1] = \
+                self._selected_word.affixes[index + 1], self._selected_word.affixes[index]
+            self._mark_dirty()
+            self._refresh_rule_view()
 
     def _on_affix_delete(self) -> None:
         """Delete selected affix."""
-        # TODO: Implement
-        pass
+        if not self._selected_affix or not self._selected_word:
+            return
+
+        index = self._selected_word.affixes.index(self._selected_affix)
+        self._selected_word.affixes.pop(index)
+        self._mark_dirty()
+        self._refresh_rule_view()
 
     # Rule menu handlers
     def _on_rule_duplicate(self) -> None:
@@ -751,28 +1128,130 @@ class RuleAssistantWindow(QMainWindow):
 
     def _on_rule_insert_before(self) -> None:
         """Insert new rule before selected."""
-        # TODO: Implement
-        pass
+        if not self._generator:
+            return
+
+        from ..model.flex_trans_rule import FLExTransRule
+        from ..model.source_target import Source, Target
+        from ..model.phrase import Phrase
+
+        new_rule = FLExTransRule(
+            name=f"Rule {len(self._generator.flex_trans_rules) + 1}",
+            source=Source(phrase=Phrase()),
+            target=Target(phrase=Phrase())
+        )
+        self._generator.flex_trans_rules.insert(self._current_rule_index, new_rule)
+        self._populate_rule_list()
+        self._mark_dirty()
 
     def _on_rule_insert_after(self) -> None:
         """Insert new rule after selected."""
-        # TODO: Implement
-        pass
+        if not self._generator:
+            return
+
+        from ..model.flex_trans_rule import FLExTransRule
+        from ..model.source_target import Source, Target
+        from ..model.phrase import Phrase
+
+        new_rule = FLExTransRule(
+            name=f"Rule {len(self._generator.flex_trans_rules) + 1}",
+            source=Source(phrase=Phrase()),
+            target=Target(phrase=Phrase())
+        )
+        self._generator.flex_trans_rules.insert(self._current_rule_index + 1, new_rule)
+        self._populate_rule_list()
+        self._mark_dirty()
 
     def _on_rule_move_up(self) -> None:
         """Move selected rule up."""
-        # TODO: Implement
-        pass
+        if not self._generator or self._current_rule_index <= 0:
+            return
+
+        rules = self._generator.flex_trans_rules
+        rules[self._current_rule_index], rules[self._current_rule_index - 1] = \
+            rules[self._current_rule_index - 1], rules[self._current_rule_index]
+        self._current_rule_index -= 1
+        self._populate_rule_list()
+        self.rule_list.setCurrentRow(self._current_rule_index)
+        self._mark_dirty()
 
     def _on_rule_move_down(self) -> None:
         """Move selected rule down."""
-        # TODO: Implement
-        pass
+        if not self._generator or self._current_rule_index >= len(self._generator.flex_trans_rules) - 1:
+            return
+
+        rules = self._generator.flex_trans_rules
+        rules[self._current_rule_index], rules[self._current_rule_index + 1] = \
+            rules[self._current_rule_index + 1], rules[self._current_rule_index]
+        self._current_rule_index += 1
+        self._populate_rule_list()
+        self.rule_list.setCurrentRow(self._current_rule_index)
+        self._mark_dirty()
 
     def _on_rule_delete(self) -> None:
         """Delete selected rule."""
-        # TODO: Implement
-        pass
+        if not self._generator or self._current_rule_index < 0:
+            return
+
+        if len(self._generator.flex_trans_rules) == 1:
+            QMessageBox.warning(self, "Error", "Cannot delete the last rule")
+            return
+
+        self._generator.flex_trans_rules.pop(self._current_rule_index)
+        self._populate_rule_list()
+        if self._current_rule_index >= len(self._generator.flex_trans_rules):
+            self._current_rule_index = len(self._generator.flex_trans_rules) - 1
+        if self._current_rule_index >= 0:
+            self.rule_list.setCurrentRow(self._current_rule_index)
+        self._mark_dirty()
+
+    # Helper methods
+    def _find_phrase_containing_word(self, rule, word) -> Optional["Phrase"]:
+        """Find which phrase contains the given word.
+
+        Args:
+            rule: The current FLExTransRule
+            word: The Word to find
+
+        Returns:
+            The Phrase containing the word, or None
+        """
+        if word in rule.source.phrase.words:
+            return rule.source.phrase
+        if word in rule.target.phrase.words:
+            return rule.target.phrase
+        return None
+
+    def _find_and_remove_feature(self, rule, feature) -> None:
+        """Find and remove a feature from a word or affix.
+
+        Args:
+            rule: The current FLExTransRule
+            feature: The Feature to remove
+        """
+        for word in rule.source.phrase.words + rule.target.phrase.words:
+            if feature in word.features:
+                word.features.remove(feature)
+                return
+            for affix in word.affixes:
+                if feature in affix.features:
+                    affix.features.remove(feature)
+                    return
+
+    def _find_and_clear_category(self, rule, category) -> None:
+        """Find and clear a category from its parent word.
+
+        Args:
+            rule: The current FLExTransRule
+            category: The Category to clear
+        """
+        for word in rule.source.phrase.words + rule.target.phrase.words:
+            # Compare by name since category objects may not be the same instance
+            if word.category_constituent and word.category_constituent.name == category.name:
+                word.word_category = ""
+                from ..model.category import Category
+                word.category_constituent = Category(name="")
+                return
 
     def get_result(self) -> WindowResult:
         """Get the result from the window.
