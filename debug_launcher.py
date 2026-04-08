@@ -155,9 +155,9 @@ def main():
         from flextrans_integration import start_rule_assistant
 
         # Create test files for debugging
-        test_rule_file = Path(__file__).parent / 'debug_rules.xml'
-        test_flex_data = Path(__file__).parent / 'debug_flex_data.xml'
-        test_data = Path(__file__).parent / 'debug_test_data.xml'
+        test_rule_file = Path(r'D:\Apps\FLExTrans\WorkProjects\German-Swedish\Output\RuleAssistantRules.xml')
+        test_flex_data = Path(r'D:\Apps\FLExTrans\WorkProjects\German-Swedish\Build\ruleAssistantGUIinput.xml')
+        test_data = Path(r'D:\Apps\FLExTrans\WorkProjects\German-Swedish\Build\RuleAssistantDisplayData.html')
 
         # Create minimal test files if they don't exist
         if not test_rule_file.exists():

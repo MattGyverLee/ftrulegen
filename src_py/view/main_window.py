@@ -1,7 +1,49 @@
 """Main Window for FLExTrans Rule Assistant"""
 
+import os
 from typing import Optional, NamedTuple
 from pathlib import Path
+import logging
+import tempfile
+from datetime import datetime
+
+# Fallback crash log
+_crash_log = Path(__file__).parent.parent / 'window_CRASH.log'
+
+def _write_crash_log(msg):
+    """Direct file write as fallback"""
+    try:
+        with open(_crash_log, 'a') as f:
+            f.write(f"{datetime.now().isoformat()} - {msg}\n")
+            f.flush()
+    except:
+        pass
+
+_write_crash_log("[INIT] main_window.py module loading")
+
+# Setup logging - robust version
+_logger = logging.getLogger(__name__)
+_logger.setLevel(logging.DEBUG)
+
+# Remove any existing handlers to avoid duplicates
+for handler in _logger.handlers[:]:
+    _logger.removeHandler(handler)
+
+try:
+    # Add file handler to temp directory
+    _log_file = __file__.replace('.py', '.log')
+    # Try to write to temp directory instead for consistency
+    _log_file = __file__.replace('main_window.py', 'view.log')
+    _file_handler = logging.FileHandler(_log_file, mode='w')
+    _file_handler.setLevel(logging.DEBUG)
+    _file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    _logger.addHandler(_file_handler)
+except Exception:
+    pass
+
+_logger.propagate = True
+_write_crash_log("[INIT] main_window.py module loaded")
+_logger.info("main_window.py module loaded")
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
@@ -9,9 +51,10 @@ from PyQt6.QtWidgets import (
     QCheckBox, QPushButton, QMenu, QComboBox, QMessageBox,
     QInputDialog, QDialog
 )
-from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebChannel import QWebChannel
-from PyQt6.QtCore import Qt, QUrl, QPoint, QSize
+# LAZY IMPORT: QWebEngine moved to __init__ to avoid early initialization
+# from PyQt6.QtWebEngineWidgets import QWebEngineView
+# from PyQt6.QtWebChannel import QWebChannel
+from PyQt6.QtCore import Qt, QUrl, QPoint, QSize, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
 
 from ..model.flex_trans_rule_generator import FLExTransRuleGenerator
@@ -44,6 +87,10 @@ class RuleAssistantWindow(QMainWindow):
     Displays rules in a tree format, manages editing and generation.
     """
 
+    # Signal emitted when window finishes (for FlexTools integration)
+    finished = pyqtSignal()
+
+
     def __init__(self, rule_file: str, flex_data_file: str, test_data_file: str,
                  came_from_lrt: bool = False, ui_lang_code: str = "en", parent=None):
         """Initialize the main window.
@@ -56,7 +103,39 @@ class RuleAssistantWindow(QMainWindow):
             ui_lang_code: UI language code
             parent: Parent widget
         """
-        super().__init__(parent)
+        _write_crash_log("[__init__] RuleAssistantWindow.__init__() starting")
+        _logger.info("=" * 80)
+        _logger.info("RuleAssistantWindow.__init__() called")
+        _logger.info("=" * 80)
+        _logger.info(f"  rule_file: {rule_file}")
+        _logger.info(f"  flex_data_file: {flex_data_file}")
+        _logger.info(f"  test_data_file: {test_data_file}")
+        _logger.info(f"  came_from_lrt: {came_from_lrt}")
+        _logger.info(f"  ui_lang_code: {ui_lang_code}")
+
+        # LAZY IMPORT: Import QWebEngine only when window is created (not at module load)
+        # This prevents Qt initialization issues when imported by FlexTools
+        _write_crash_log("[__init__] About to lazy import QWebEngineView and QWebChannel")
+        _logger.info("About to lazy import QWebEngineView and QWebChannel")
+        global QWebEngineView, QWebChannel
+        try:
+            from PyQt6.QtWebEngineWidgets import QWebEngineView
+            from PyQt6.QtWebChannel import QWebChannel
+            _write_crash_log("[__init__] QWebEngineView and QWebChannel imported successfully")
+            _logger.info("QWebEngineView and QWebChannel imported successfully")
+        except Exception as e:
+            _write_crash_log(f"[__init__] FAILED to import QWebEngine: {e}")
+            raise
+
+        _write_crash_log("[__init__] About to call super().__init__()")
+        _logger.info("About to call super().__init__()")
+        try:
+            super().__init__(parent)
+            _write_crash_log("[__init__] super().__init__() completed successfully")
+            _logger.info("super().__init__() completed")
+        except Exception as e:
+            _write_crash_log(f"[__init__] FAILED in super().__init__(): {e}")
+            raise
 
         self.rule_file = rule_file
         self.flex_data_file = flex_data_file
@@ -65,38 +144,96 @@ class RuleAssistantWindow(QMainWindow):
         self.ui_lang_code = ui_lang_code
 
         # Data and state
+        _write_crash_log("[__init__] Initializing data and state")
+        _logger.info("Initializing data and state")
         self._generator: Optional[FLExTransRuleGenerator] = None
         self._flex_data: Optional[FLExData] = None
         self._current_rule_index = 0
         self._dirty = False
         self._result = WindowResult(saved=False, rule_index=None, launch_lrt=False)
+        _write_crash_log("[__init__] Data and state initialized")
 
         # Services
+        _write_crash_log("[__init__] Creating services")
+        _logger.info("Creating services")
         self._producer = WebPageProducer()
+        _write_crash_log("[__init__] WebPageProducer created")
         self._finder = ConstituentFinder()
+        _write_crash_log("[__init__] ConstituentFinder created")
         self._preferences = ApplicationPreferences()
+        _write_crash_log("[__init__] ApplicationPreferences created")
+        _logger.info("Services created")
 
         # Selected constituents for context menu operations
+        _write_crash_log("[__init__] Initializing selected constituents")
         self._selected_word: Optional[Word] = None
         self._selected_category = None
         self._selected_feature = None
         self._selected_affix = None
 
         # Setup UI
+        _write_crash_log("[__init__] About to create UI")
+        _logger.info("About to create UI")
         self._create_ui()
-        self._create_context_menus()
-        self._setup_keyboard_shortcuts()
+        _write_crash_log("[__init__] UI created successfully")
+        _write_crash_log("[__init__] UI created successfully")
+        _logger.info("UI created")
+
+        _write_crash_log("[__init__] About to create context menus")
+        _logger.info("About to create context menus")
+        try:
+            self._create_context_menus()
+            _write_crash_log("[__init__] Context menus created successfully")
+            _logger.info("Context menus created")
+        except Exception as e:
+            import traceback
+            _write_crash_log(f"[__init__] FAILED to create context menus: {e}")
+            _logger.error(f"Exception creating context menus: {e}")
+            _logger.error(traceback.format_exc())
+            # Don't crash - menus are optional, window can work without them
+            _logger.warning("Continuing without context menus")
+
+        _write_crash_log("[__init__] About to setup keyboard shortcuts")
+        _logger.info("About to setup keyboard shortcuts")
+        try:
+            self._setup_keyboard_shortcuts()
+            _write_crash_log("[__init__] Keyboard shortcuts setup successfully")
+            _logger.info("Keyboard shortcuts setup")
+        except Exception as e:
+            import traceback
+            _write_crash_log(f"[__init__] FAILED to setup keyboard shortcuts: {e}")
+            _logger.error(f"Exception setting up keyboard shortcuts: {e}")
+            _logger.error(traceback.format_exc())
+            # Don't crash - shortcuts are optional
+            _logger.warning("Continuing without keyboard shortcuts")
 
         # Setup WebView
+        _write_crash_log("[__init__] About to setup WebView")
+        _logger.info("About to setup WebView")
         self._setup_webview()
+        _write_crash_log("[__init__] WebView setup complete")
+        _logger.info("WebView setup complete")
 
         # Load data
+        _write_crash_log("[__init__] About to load data")
+        _logger.info("About to load data")
         self._load_data()
+        _write_crash_log("[__init__] Data loaded successfully")
+        _logger.info("Data loaded")
 
         # Restore window state
+        _write_crash_log("[__init__] About to restore window state")
+        _logger.info("About to restore window state")
         self._restore_window_state()
+        _write_crash_log("[__init__] Window state restored successfully")
+        _logger.info("Window state restored")
 
+        _write_crash_log("[__init__] About to set window title")
         self.setWindowTitle("FLExTrans Rule Assistant")
+        _write_crash_log("[__init__] Window title set successfully")
+        _logger.info("Window title set")
+        _write_crash_log("[__init__] RuleAssistantWindow.__init__() completed successfully")
+        _logger.info("RuleAssistantWindow.__init__() completed successfully")
 
     def _create_ui(self) -> None:
         """Create the main UI layout."""
@@ -238,24 +375,100 @@ class RuleAssistantWindow(QMainWindow):
         return pane
 
     def _setup_webview(self) -> None:
-        """Setup QWebEngineView with QWebChannel bridge."""
-        # Disable context menu on webview
-        self.tree_view.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+        """Setup QWebEngineView with optional QWebChannel bridge."""
+        try:
+            _write_crash_log("[webview] _setup_webview() starting")
+            _logger.info("_setup_webview() starting")
 
-        # Create web channel
-        self._channel = QWebChannel(self.tree_view.page())
+            # Disable context menu on webview
+            _write_crash_log("[webview] About to set context menu policy on tree_view")
+            _logger.info("Setting context menu policy on tree_view")
+            self.tree_view.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+            _write_crash_log("[webview] Context menu policy set successfully")
+            _logger.info("Context menu policy set")
 
-        # Create interactor and register it
-        self._interactor = WebPageInteractor(self)
-        self._channel.registerObject("ftRuleGenApp", self._interactor)
+            # Detect if we're in FlexTools mode (in-process) vs subprocess mode
+            # RULE_ASSISTANT_STANDALONE=1: subprocess with isolated Qt event loop (can render)
+            # RULE_ASSISTANT_STANDALONE not set: in-process within FlexTools (skip rendering)
+            env_standalone = os.environ.get('RULE_ASSISTANT_STANDALONE')
+            in_flextools = env_standalone != '1'
+            _write_crash_log(f"[webview] RULE_ASSISTANT_STANDALONE={env_standalone!r}, in_flextools={in_flextools}")
+            _logger.info(f"RULE_ASSISTANT_STANDALONE={env_standalone!r}, in_flextools={in_flextools}")
 
-        # Attach channel to page
-        self.tree_view.page().setWebChannel(self._channel)
+            # Setup QWebChannel in subprocess mode only
+            # In FlexTools (in-process) mode, skip to avoid conflicts
+            if in_flextools:  # Skip QWebChannel in FlexTools in-process mode
+                _write_crash_log("[webview] SKIPPING QWebChannel - will display tree as static HTML")
+                _logger.warning("Skipping QWebChannel setup for stability")
+                _logger.warning("Tree will display as static HTML - no interactive context menus")
+                self._channel = None
+                self._interactor = None
+            else:
+                # Standalone mode: setup QWebChannel for full interactivity
+                try:
+                    _write_crash_log("[webview] About to create QWebChannel")
+                    _logger.info("Creating QWebChannel")
+                    # Try with self.tree_view as parent instead of self.tree_view.page()
+                    self._channel = QWebChannel(self.tree_view)
+                    _write_crash_log("[webview] QWebChannel created successfully")
+                    _logger.info("QWebChannel created successfully")
+
+                    # Create interactor and register it
+                    _write_crash_log("[webview] About to create WebPageInteractor")
+                    _logger.info("Creating WebPageInteractor")
+                    self._interactor = WebPageInteractor(self)
+                    _write_crash_log("[webview] WebPageInteractor created successfully")
+                    _logger.info("Registering object with QWebChannel")
+                    _write_crash_log("[webview] About to register object with QWebChannel")
+                    self._channel.registerObject("ftRuleGenApp", self._interactor)
+                    _write_crash_log("[webview] Object registered with QWebChannel successfully")
+                    _logger.info("Object registered with QWebChannel")
+
+                    # Attach channel to page - this can crash in FlexTools mode
+                    # Wrap in defensive try-catch
+                    try:
+                        _write_crash_log("[webview] About to set WebChannel on page")
+                        _logger.info("Setting WebChannel on page")
+                        self.tree_view.page().setWebChannel(self._channel)
+                        _write_crash_log("[webview] WebChannel set on page successfully")
+                        _logger.info("WebChannel set on page successfully")
+                    except Exception as e:
+                        _write_crash_log(f"[webview] FAILED to set WebChannel on page: {e}")
+                        _logger.error(f"FAILED to set WebChannel on page: {e}")
+                        import traceback
+                        _logger.error(traceback.format_exc())
+                        _write_crash_log("[webview] Continuing without WebChannel - interactivity disabled")
+                        _logger.warning("WebChannel not attached to page - tree will be static display only")
+                        # Don't crash - the window can still display the tree
+                        self._channel = None
+                        self._interactor = None
+
+                except Exception as e:
+                    _write_crash_log(f"[webview] FAILED to setup QWebChannel: {e}")
+                    _logger.error(f"FAILED to setup QWebChannel: {e}")
+                    import traceback
+                    _logger.error(traceback.format_exc())
+                    # Store the error but don't crash - the window can still display something
+                    self._channel = None
+                    self._interactor = None
+                    _write_crash_log("[webview] QWebChannel setup failed - continuing without it")
+                    _logger.warning("QWebChannel setup failed - tree view will have limited functionality")
+
+            _write_crash_log("[webview] _setup_webview() completed successfully")
+            _logger.info("_setup_webview() completed")
+        except Exception as e:
+            _write_crash_log(f"[webview] Exception in _setup_webview: {e}")
+            import traceback
+            _logger.error(f"Exception in _setup_webview: {e}")
+            _logger.error(traceback.format_exc())
+            raise
 
     def _create_context_menus(self) -> None:
         """Create all context menus."""
+        _write_crash_log("[menu] Creating word menu")
         # Word context menu
         self._word_menu = QMenu()
+        _write_crash_log("[menu] Word menu created")
         self._word_menu.addAction("Duplicate", self._on_word_duplicate)
         self._word_menu.addSeparator()
         self._word_menu.addAction("Change Number", self._on_word_change_number)
@@ -322,39 +535,122 @@ class RuleAssistantWindow(QMainWindow):
 
     def _setup_keyboard_shortcuts(self) -> None:
         """Setup keyboard shortcuts."""
+        _write_crash_log("[shortcut] Creating Ctrl+S shortcut")
         QShortcut(QKeySequence("Ctrl+S"), self, self._on_save)
+        _write_crash_log("[shortcut] Ctrl+S shortcut created successfully")
 
     def _load_data(self) -> None:
         """Load rule and FLEx data files."""
         try:
-            # Load rules
-            self._generator = XMLBackEndProvider.load_data_from_file(self.rule_file)
+            _write_crash_log("[load_data] _load_data() starting")
+            _logger.info("_load_data() starting")
 
-            # Load FLEx data
-            self._flex_data = XMLFLExDataBackEndProvider.load_data_from_file(self.flex_data_file)
+            # Load rules
+            _write_crash_log("[load_data] About to load rules")
+            _logger.info(f"Loading rules from: {self.rule_file}")
+            self._generator = XMLBackEndProvider.load_data_from_file(self.rule_file)
+            _write_crash_log(f"[load_data] Rules loaded: {len(self._generator.flex_trans_rules) if self._generator else 0}")
+            _logger.info(f"Loaded {len(self._generator.flex_trans_rules) if self._generator else 0} rules")
+
+            # Load FLEx data (optional)
+            _write_crash_log("[load_data] About to load FLEx data")
+            if self.flex_data_file:
+                _logger.info(f"Loading FLEx data from: {self.flex_data_file}")
+                self._flex_data = XMLFLExDataBackEndProvider.load_data_from_file(self.flex_data_file)
+                _write_crash_log("[load_data] FLEx data loaded")
+                _logger.info("FLEx data loaded")
+            else:
+                _write_crash_log("[load_data] No FLEx data file provided")
+                _logger.info("No FLEx data file provided")
 
             # Populate rule list
+            _write_crash_log("[load_data] About to populate rule list")
+            _logger.info("Populating rule list")
             self._populate_rule_list()
+            _write_crash_log(f"[load_data] Rule list populated")
+            _logger.info(f"Rule list populated with {self.rule_list.count()} items")
 
             # Load test data
-            if Path(self.test_data_file).exists():
-                self.test_data_view.load(QUrl.fromLocalFile(self.test_data_file))
+            _write_crash_log("[load_data] About to load test data")
 
+            # Check if we're in FlexTools mode - loading HTML crashes in FlexTools
+            env_standalone = os.environ.get('RULE_ASSISTANT_STANDALONE')
+            in_flextools = env_standalone != '1'
+
+            if self.test_data_file and Path(self.test_data_file).exists():
+                _write_crash_log(f"[load_data] Test data file exists: {self.test_data_file}")
+                _logger.info(f"Loading test data from: {self.test_data_file}")
+
+                if in_flextools:
+                    _write_crash_log("[load_data] SKIPPING test data load in FlexTools mode (would crash)")
+                    _logger.warning("Skipping test data load in FlexTools mode")
+                else:
+                    try:
+                        _write_crash_log("[load_data] About to call test_data_view.load() (standalone mode)")
+                        self.test_data_view.load(QUrl.fromLocalFile(self.test_data_file))
+                        _write_crash_log("[load_data] test_data_view.load() completed")
+                    except Exception as e:
+                        _write_crash_log(f"[load_data] FAILED to load test data: {e}")
+                        _logger.error(f"Failed to load test data: {e}")
+                        import traceback
+                        _logger.error(traceback.format_exc())
+                _write_crash_log("[load_data] Test data loaded")
+                _logger.info("Test data loaded")
+            else:
+                _write_crash_log(f"[load_data] No test data file or file doesn't exist")
+                _logger.info(f"No test data: file={self.test_data_file}, exists={Path(self.test_data_file).exists() if self.test_data_file else False}")
+
+            _write_crash_log("[load_data] About to mark as not dirty")
             self._dirty = False
+            _write_crash_log("[load_data] _load_data() completed successfully")
+            _logger.info("_load_data() completed successfully")
         except Exception as e:
+            _write_crash_log(f"[load_data] Exception in _load_data: {e}")
+            import traceback
+            _logger.error(f"Exception in _load_data: {e}")
+            _logger.error(traceback.format_exc())
             QMessageBox.critical(self, "Error Loading Data", f"Failed to load data: {e}")
 
     def _populate_rule_list(self) -> None:
         """Populate the rule list from generator."""
-        self.rule_list.clear()
-        if self._generator:
-            for i, rule in enumerate(self._generator.flex_trans_rules):
-                item = QListWidgetItem(rule.name or f"Rule {i+1}")
-                self.rule_list.addItem(item)
+        try:
+            _write_crash_log("[populate] _populate_rule_list() starting")
+            self.rule_list.clear()
+            _write_crash_log("[populate] Rule list cleared")
 
-        # Select first rule
-        if self.rule_list.count() > 0:
-            self.rule_list.setCurrentRow(0)
+            if self._generator:
+                _write_crash_log(f"[populate] About to add {len(self._generator.flex_trans_rules)} rules")
+                for i, rule in enumerate(self._generator.flex_trans_rules):
+                    _write_crash_log(f"[populate] Processing rule {i}: {rule.name}")
+                    item = QListWidgetItem(rule.name or f"Rule {i+1}")
+                    self.rule_list.addItem(item)
+                    _write_crash_log(f"[populate] Added rule {i} to list")
+
+            _write_crash_log(f"[populate] Total rules in list: {self.rule_list.count()}")
+
+            # Select first rule
+            _write_crash_log("[populate] About to select first rule")
+            if self.rule_list.count() > 0:
+                try:
+                    _write_crash_log("[populate] Calling setCurrentRow(0)")
+                    self.rule_list.setCurrentRow(0)
+                    _write_crash_log("[populate] setCurrentRow(0) completed")
+                except Exception as e:
+                    _write_crash_log(f"[populate] FAILED to select first rule: {e}")
+                    _logger.error(f"Failed to select first rule: {e}")
+                    import traceback
+                    _logger.error(traceback.format_exc())
+                _write_crash_log("[populate] First rule selected")
+            else:
+                _write_crash_log("[populate] No rules to select")
+
+            _write_crash_log("[populate] _populate_rule_list() completed successfully")
+        except Exception as e:
+            _write_crash_log(f"[populate] Exception in _populate_rule_list: {e}")
+            import traceback
+            _logger.error(f"Exception in _populate_rule_list: {e}")
+            _logger.error(traceback.format_exc())
+            raise
 
     def _show_rule(self, index: int) -> None:
         """Show a rule in the editor.
@@ -362,26 +658,69 @@ class RuleAssistantWindow(QMainWindow):
         Args:
             index: Rule index
         """
-        if not self._generator or index < 0 or index >= len(self._generator.flex_trans_rules):
-            return
+        try:
+            _write_crash_log(f"[show_rule] _show_rule({index}) starting")
+            if not self._generator or index < 0 or index >= len(self._generator.flex_trans_rules):
+                _write_crash_log(f"[show_rule] Invalid index: {index}")
+                return
 
-        self._current_rule_index = index
-        rule = self._generator.flex_trans_rules[index]
+            self._current_rule_index = index
+            rule = self._generator.flex_trans_rules[index]
+            _write_crash_log(f"[show_rule] Got rule at index {index}")
 
-        # Update fields
-        self.rule_name_field.setText(rule.name)
-        self.rule_description_field.setPlainText(rule.description)
-        self.permutations_combo.setCurrentText(
-            {
-                PermutationsValue.no: "no",
-                PermutationsValue.not_head: "not head",
-                PermutationsValue.with_head: "with head",
-            }.get(rule.create_permutations, "with head")
-        )
+            # Update fields
+            _write_crash_log("[show_rule] About to update rule name field")
+            self.rule_name_field.setText(rule.name)
+            _write_crash_log("[show_rule] Rule name field updated")
 
-        # Generate and show HTML
-        html = self._producer.produce_web_page(rule)
-        self.tree_view.setHtml(html, QUrl("qrc:///"))
+            _write_crash_log("[show_rule] About to update rule description field")
+            self.rule_description_field.setPlainText(rule.description)
+            _write_crash_log("[show_rule] Rule description field updated")
+
+            _write_crash_log("[show_rule] About to update permutations combo")
+            self.permutations_combo.setCurrentText(
+                {
+                    PermutationsValue.no: "no",
+                    PermutationsValue.not_head: "not head",
+                    PermutationsValue.with_head: "with head",
+                }.get(rule.create_permutations, "with head")
+            )
+            _write_crash_log("[show_rule] Permutations combo updated")
+
+            # Generate and show HTML
+            _write_crash_log("[show_rule] About to generate HTML")
+            html = self._producer.produce_web_page(rule)
+            _write_crash_log(f"[show_rule] HTML generated, length={len(html)}")
+
+            # Check if we're in FlexTools mode - setHtml crashes in FlexTools
+            env_standalone = os.environ.get('RULE_ASSISTANT_STANDALONE')
+            in_flextools = env_standalone != '1'
+            _write_crash_log(f"[show_rule] RULE_ASSISTANT_STANDALONE={env_standalone!r}, in_flextools={in_flextools}")
+
+            if in_flextools:
+                _write_crash_log("[show_rule] SKIPPING setHtml in FlexTools mode - tree view will remain empty")
+                _logger.warning("Skipping tree view HTML update in FlexTools mode")
+                # Don't call setHtml - it crashes in FlexTools mode
+                # The tree view will be empty, but the rule can still be edited
+            else:
+                _write_crash_log("[show_rule] About to call setHtml on tree_view (standalone mode)")
+                _write_crash_log(f"[show_rule] tree_view size: {self.tree_view.width()}x{self.tree_view.height()}")
+                try:
+                    self.tree_view.setHtml(html, QUrl("qrc:///"))
+                    _write_crash_log("[show_rule] setHtml completed successfully")
+                    _write_crash_log(f"[show_rule] tree_view size after setHtml: {self.tree_view.width()}x{self.tree_view.height()}")
+                except Exception as e:
+                    _write_crash_log(f"[show_rule] setHtml failed with exception: {e}")
+                    _logger.error(f"setHtml failed: {e}")
+                    import traceback
+                    _logger.error(traceback.format_exc())
+
+            _write_crash_log("[show_rule] _show_rule() completed successfully")
+        except Exception as e:
+            _write_crash_log(f"[show_rule] Exception in _show_rule: {e}")
+            import traceback
+            _logger.error(f"Exception in _show_rule: {e}")
+            _logger.error(traceback.format_exc())
 
         # Update overwrite checkbox
         self.overwrite_checkbox.setChecked(
@@ -402,22 +741,66 @@ class RuleAssistantWindow(QMainWindow):
 
     def _restore_window_state(self) -> None:
         """Restore window size and position from preferences."""
-        x = self._preferences.get_window_position_x()
-        y = self._preferences.get_window_position_y()
-        w = self._preferences.get_window_width()
-        h = self._preferences.get_window_height()
-        maximized = self._preferences.get_window_maximized()
+        try:
+            _write_crash_log("[window_state] _restore_window_state() starting")
+            x = self._preferences.get_window_position_x()
+            y = self._preferences.get_window_position_y()
+            w = self._preferences.get_window_width()
+            h = self._preferences.get_window_height()
+            maximized = self._preferences.get_window_maximized()
+            _write_crash_log(f"[window_state] Got preferences: x={x}, y={y}, w={w}, h={h}, max={maximized}")
 
-        self.setGeometry(x, y, w, h)
-        if maximized:
-            self.showMaximized()
-        else:
-            self.show()
+            # Ensure window is visible on screen (not above y=0)
+            if y < 0:
+                y = 50
+                _write_crash_log(f"[window_state] Adjusted y from negative to {y}")
+            if x < 0:
+                x = 50
+                _write_crash_log(f"[window_state] Adjusted x from negative to {x}")
+            if w < 400:
+                w = 1200
+                _write_crash_log(f"[window_state] Adjusted w from {w} to 1200")
+            if h < 300:
+                h = 800
+                _write_crash_log(f"[window_state] Adjusted h from {h} to 800")
 
-        # Restore selected rule
-        last_rule = self._preferences.get_last_selected_rule()
-        if 0 <= last_rule < self.rule_list.count():
-            self.rule_list.setCurrentRow(last_rule)
+            _write_crash_log("[window_state] About to call setGeometry")
+            self.setGeometry(x, y, w, h)
+            _write_crash_log("[window_state] setGeometry completed")
+
+            # Check if we're in FlexTools mode - show() crashes in FlexTools
+            env_standalone = os.environ.get('RULE_ASSISTANT_STANDALONE')
+            in_flextools = env_standalone != '1'
+            _write_crash_log(f"[window_state] RULE_ASSISTANT_STANDALONE={env_standalone!r}, in_flextools={in_flextools}")
+
+            if in_flextools:
+                _write_crash_log("[window_state] SKIPPING show/showMaximized in FlexTools mode")
+                _logger.warning("Skipping show/showMaximized in FlexTools mode - window managed by FlexTools")
+            else:
+                if maximized:
+                    _write_crash_log("[window_state] About to call showMaximized")
+                    self.showMaximized()
+                    _write_crash_log("[window_state] showMaximized completed")
+                else:
+                    _write_crash_log("[window_state] About to call show")
+                    self.show()
+                    _write_crash_log("[window_state] show completed")
+
+            # Restore selected rule
+            _write_crash_log("[window_state] About to restore selected rule")
+            last_rule = self._preferences.get_last_selected_rule()
+            _write_crash_log(f"[window_state] last_rule={last_rule}, rule_list.count()={self.rule_list.count()}")
+            if 0 <= last_rule < self.rule_list.count():
+                _write_crash_log(f"[window_state] About to setCurrentRow({last_rule})")
+                self.rule_list.setCurrentRow(last_rule)
+                _write_crash_log("[window_state] setCurrentRow completed")
+
+            _write_crash_log("[window_state] _restore_window_state() completed successfully")
+        except Exception as e:
+            _write_crash_log(f"[window_state] Exception in _restore_window_state: {e}")
+            import traceback
+            _logger.error(f"Exception in _restore_window_state: {e}")
+            _logger.error(traceback.format_exc())
 
     def _save_window_state(self) -> None:
         """Save window state to preferences."""
@@ -483,9 +866,20 @@ class RuleAssistantWindow(QMainWindow):
     # Signal handlers
     def _on_rule_selected(self) -> None:
         """Handle rule selection in list."""
-        row = self.rule_list.currentRow()
-        if row >= 0:
-            self._show_rule(row)
+        try:
+            _write_crash_log("[select] _on_rule_selected() called")
+            row = self.rule_list.currentRow()
+            _write_crash_log(f"[select] Current row: {row}")
+            if row >= 0:
+                _write_crash_log(f"[select] About to show rule {row}")
+                self._show_rule(row)
+                _write_crash_log(f"[select] Rule {row} shown successfully")
+            _write_crash_log("[select] _on_rule_selected() completed")
+        except Exception as e:
+            _write_crash_log(f"[select] Exception in _on_rule_selected: {e}")
+            import traceback
+            _logger.error(f"Exception in _on_rule_selected: {e}")
+            _logger.error(traceback.format_exc())
 
     def _on_rule_name_changed(self) -> None:
         """Handle rule name text change."""
@@ -1262,14 +1656,23 @@ class RuleAssistantWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         """Handle window close event."""
-        if self._dirty:
-            reply = QMessageBox.question(
-                self, "Unsaved Changes",
-                "You have unsaved changes. Save before closing?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                self._on_save()
+        _logger.info("closeEvent() called")
+        try:
+            if self._dirty:
+                reply = QMessageBox.question(
+                    self, "Unsaved Changes",
+                    "You have unsaved changes. Save before closing?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if reply == QMessageBox.StandardButton.Yes:
+                    self._on_save()
 
-        self._save_window_state()
-        event.accept()
+            self._save_window_state()
+            event.accept()
+            self.finished.emit()
+            _logger.info("closeEvent() completed successfully")
+        except Exception as e:
+            import traceback
+            _logger.error(f"Exception in closeEvent: {e}")
+            _logger.error(traceback.format_exc())
+            event.accept()  # Accept anyway to allow window to close

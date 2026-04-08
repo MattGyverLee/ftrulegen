@@ -6,7 +6,9 @@
       "Bash(python -m pytest 'src-py/tests/test_model.py::TestEnums::test_affix_type_values' -v)",
       "Bash(python:*)",
       "Bash(xargs grep:*)",
-      "Bash(find . -name *.css -o -name *tree* -type f)"
+      "Bash(find . -name *.css -o -name *tree* -type f)",
+      "WebSearch",
+      "Bash(C:Python313python.exe:*)"
     ]
   }
 }
