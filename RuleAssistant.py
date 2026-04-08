@@ -441,34 +441,36 @@ def GetTestDataFile(report, DB, configMap):
 def StartRuleAssistant(report, ruleAssistantFile, ruleAssistGUIinputfile,
                        testDataFile, fromLRT=False):
 
-    # Call the rule assistant gui program
+    # Call the Rule Assistant PyQt6 window (in-process)
     try:
-        fullRApath = os.path.join(os.environ['PROGRAMFILES'], FTPaths.RULE_ASSISTANT_DIR, FTPaths.RULE_ASSISTANT)
+        # Add src-py to path for module import
+        import sys
+        src_py_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src-py')
+        if src_py_path not in sys.path:
+            sys.path.insert(0, src_py_path)
 
-        params = [fullRApath, ruleAssistantFile, ruleAssistGUIinputfile,
-                  testDataFile, 'y' if fromLRT else 'n', Utils.getInterfaceLangCode()]
+        from flextrans_integration import start_rule_assistant
 
-        result = subprocess.run(params, capture_output=True)
+        # Call the Python window
+        saved, rule_index, launch_lrt = start_rule_assistant(
+            rule_file=ruleAssistantFile,
+            flex_data_file=ruleAssistGUIinputfile,
+            test_data_file=testDataFile,
+            came_from_lrt=fromLRT,
+            ui_lang_code=Utils.getInterfaceLangCode()
+        )
 
-        output = result.stdout.decode('utf-8').strip().split()
-        lrt = (not fromLRT) and ('LRT' in output)
+        # Adjust lrt flag: don't launch LRT if called from LRT already
+        final_lrt = (not fromLRT) and launch_lrt
 
-        if not output or output[0] not in ['1', '2']:
-            
-            if len(output) > 1:
-
-                report.Error(_translate('RuleAssistant', 'An error happened when running the {ruleAssistant} tool: {error}').format(error=' '.join(output), ruleAssistant=docs[FTM_Name]))
-            
-            return (False, None, lrt)
-        
-        elif output[0] == '1':
-            
-            return (True, int(output[1]), lrt) # create single rule
+        if not saved:
+            return (False, None, final_lrt)
+        elif rule_index is not None:
+            return (True, rule_index, final_lrt)  # create single rule
         else:
-            return (True, None, lrt) # create all rules
+            return (True, None, final_lrt)  # create all rules
 
     except Exception as e:
-
         report.Error(_translate('RuleAssistant', 'An error happened when running the {ruleAssistant} tool: {error}').format(error=str(e), ruleAssistant=docs[FTM_Name]))
         return (False, None, False)
 
