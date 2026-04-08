@@ -223,8 +223,8 @@ class TestRuleGenerator(unittest.TestCase):
     def test_generator_duplicate_rule(self):
         """Test duplicating a rule."""
         gen = FLExTransRuleGenerator()
-        source = Source(phrase=Phrase(phrase_type=PhraseType.source))
-        target = Target(phrase=Phrase(phrase_type=PhraseType.target))
+        source = Source()
+        target = Target()
         rule = FLExTransRule(name="Rule1", source=source, target=target)
         gen.flex_trans_rules.append(rule)
 

@@ -33,14 +33,14 @@ class RuleIdentifierAndParentSetter:
         self.counter = 0
 
         # Set source phrase and all its children
-        self._set_phrase_identifiers(rule.source.phrase, rule)
+        self._set_phrase_identifiers(rule.source, rule)
 
         # Set target phrase and all its children
-        self._set_phrase_identifiers(rule.target.phrase, rule)
+        self._set_phrase_identifiers(rule.target, rule)
 
         # Set phrase parents
-        rule.source.phrase.parent = rule
-        rule.target.phrase.parent = rule
+        rule.source.parent = rule
+        rule.target.parent = rule
 
     def _set_phrase_identifiers(self, phrase, rule) -> None:
         """Recursively assign identifiers to a phrase and all children.

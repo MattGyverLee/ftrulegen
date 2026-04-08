@@ -19,7 +19,7 @@ class FLExTransRuleGenerator:
 
     flex_trans_rules: list[FLExTransRule] = field(default_factory=list)
     disjoint_features: list["DisjointFeatureSet"] = field(default_factory=list)
-    overwrite_rules: OverwriteRulesValue = OverwriteRulesValue.yes
+    overwrite_rules: OverwriteRulesValue = OverwriteRulesValue.no
 
     def __post_init__(self):
         # Set parent pointers

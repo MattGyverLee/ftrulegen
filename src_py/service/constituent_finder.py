@@ -25,11 +25,11 @@ class ConstituentFinder:
             The RuleConstituent with the given identifier, or None
         """
         # Use target phrase's identifier as the split point
-        target_phrase_id = rule.target.phrase.identifier
+        target_phrase_id = rule.target.identifier
 
         if identifier < target_phrase_id:
             # Search in source phrase
-            return rule.source.phrase.find_constituent(identifier)
+            return rule.source.find_constituent(identifier)
         else:
             # Search in target phrase
-            return rule.target.phrase.find_constituent(identifier)
+            return rule.target.find_constituent(identifier)

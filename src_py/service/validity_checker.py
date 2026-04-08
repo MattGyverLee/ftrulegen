@@ -25,7 +25,7 @@ class ValidityChecker:
         Returns:
             Tuple of (is_valid, error_message)
         """
-        for word in rule.source.phrase.words:
+        for word in rule.source.words:
             if not word.word_category:
                 return False, f"Source word {word.word_id or '?'} is missing a category"
         return True, ""
@@ -40,7 +40,7 @@ class ValidityChecker:
         Returns:
             Tuple of (is_valid, error_message)
         """
-        for word in rule.target.phrase.words:
+        for word in rule.target.words:
             if word.features:
                 return True, ""
             for affix in word.affixes:
@@ -60,7 +60,7 @@ class ValidityChecker:
         """
         from ..model.enums import HeadValue
 
-        words = rule.target.phrase.words
+        words = rule.target.words
         if len(words) <= 1:
             return True, ""
 

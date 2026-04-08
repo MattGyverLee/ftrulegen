@@ -45,14 +45,12 @@ class XMLBackEndProvider:
             rule = FLExTransRule(name="Rule 1")
             rule.source = Source()
             rule.target = Target()
-            rule.source.phrase.phrase_type = PhraseType.source
-            rule.target.phrase.phrase_type = PhraseType.target
             word_s = Word(word_id="1")
             word_t = Word(word_id="1")
-            rule.source.phrase.words = [word_s]
-            rule.target.phrase.words = [word_t]
-            word_s.parent = rule.source.phrase
-            word_t.parent = rule.target.phrase
+            rule.source.words = [word_s]
+            rule.target.words = [word_t]
+            word_s.parent = rule.source
+            word_t.parent = rule.target
             generator.flex_trans_rules = [rule]
             XMLBackEndProvider.save_data_to_file(generator, filename)
             return generator
@@ -82,10 +80,10 @@ class XMLBackEndProvider:
 
         # Post-process: set phrase types and create category constituents
         for rule in generator.flex_trans_rules:
-            rule.target.phrase.phrase_type = PhraseType.target
-            rule.source.phrase.phrase_type = PhraseType.source
-            XMLBackEndProvider._set_category_constituents_in_words(rule.source.phrase)
-            XMLBackEndProvider._set_category_constituents_in_words(rule.target.phrase)
+            rule.target.phrase_type = PhraseType.target
+            rule.source.phrase_type = PhraseType.source
+            XMLBackEndProvider._set_category_constituents_in_words(rule.source)
+            XMLBackEndProvider._set_category_constituents_in_words(rule.target)
 
         return generator
 
@@ -135,9 +133,12 @@ class XMLBackEndProvider:
         Returns:
             Parsed FLExTransRule
         """
+        desc_el = rule_el.find("Description")
+        description = desc_el.text if desc_el is not None and desc_el.text else ""
+
         rule = FLExTransRule(
             name=rule_el.get("name", ""),
-            description=(rule_el.find("Description") or ET.Element("Description")).text or "",
+            description=description,
             create_permutations=PermutationsValue(rule_el.get("create_permutations", "with_head")),
         )
 
@@ -146,16 +147,20 @@ class XMLBackEndProvider:
         if source_el is not None:
             phrase_el = source_el.find("Phrase")
             if phrase_el is not None:
-                rule.source.phrase = XMLBackEndProvider._parse_phrase(phrase_el, PhraseType.source)
-                rule.source.phrase.parent = rule.source
+                parsed_phrase = XMLBackEndProvider._parse_phrase(phrase_el, PhraseType.source)
+                rule.source.words = parsed_phrase.words
+                for word in rule.source.words:
+                    word.parent = rule.source
 
         # Target phrase
         target_el = rule_el.find("Target")
         if target_el is not None:
             phrase_el = target_el.find("Phrase")
             if phrase_el is not None:
-                rule.target.phrase = XMLBackEndProvider._parse_phrase(phrase_el, PhraseType.target)
-                rule.target.phrase.parent = rule.target
+                parsed_phrase = XMLBackEndProvider._parse_phrase(phrase_el, PhraseType.target)
+                rule.target.words = parsed_phrase.words
+                for word in rule.target.words:
+                    word.parent = rule.target
 
         return rule
 
@@ -299,10 +304,10 @@ class XMLBackEndProvider:
         desc_el.text = rule.description or ""
 
         source_el = ET.SubElement(rule_el, "Source")
-        XMLBackEndProvider._create_phrase_element(rule.source.phrase, source_el)
+        XMLBackEndProvider._create_phrase_element(rule.source, source_el)
 
         target_el = ET.SubElement(rule_el, "Target")
-        XMLBackEndProvider._create_phrase_element(rule.target.phrase, target_el)
+        XMLBackEndProvider._create_phrase_element(rule.target, target_el)
 
     @staticmethod
     def _create_phrase_element(phrase: Phrase, parent_el) -> None:

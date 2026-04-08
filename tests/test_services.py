@@ -105,8 +105,8 @@ class TestRuleIdentifierAndParentSetter(unittest.TestCase):
         setter.set_identifiers_and_parents(rule)
 
         # Check parents
-        self.assertEqual(source.phrase.parent, None)  # Root has no parent
-        self.assertEqual(sw.parent, source.phrase)
+        self.assertEqual(source.parent, rule)  # Source has rule as parent
+        self.assertEqual(sw.parent, source)
 
 
 class TestConstituentFinder(unittest.TestCase):

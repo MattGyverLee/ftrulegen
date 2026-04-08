@@ -107,9 +107,9 @@ class WebPageProducer:
         """
         return (
             "<table>\n<tr>\n"
-            + self._phrase_td(rule.source.phrase)
+            + self._phrase_td(rule.source)
             + '<td>\n<span class="arrow"/>\n</td>\n'
-            + self._phrase_td(rule.target.phrase)
+            + self._phrase_td(rule.target)
             + "</tr>\n</table>\n"
         )
 
