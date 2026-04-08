@@ -8,7 +8,13 @@ import sys
 from typing import NamedTuple, Optional
 from PyQt6.QtWidgets import QApplication
 
-from .view.main_window import RuleAssistantWindow, WindowResult
+# Support both package-style imports (from src_py.flextrans_integration)
+# and direct imports (from sys.path when src_py is added to path)
+try:
+    from .view.main_window import RuleAssistantWindow, WindowResult
+except ImportError:
+    # If relative import fails, try absolute import (for when src_py is in sys.path)
+    from src_py.view.main_window import RuleAssistantWindow, WindowResult
 
 
 def start_rule_assistant(
