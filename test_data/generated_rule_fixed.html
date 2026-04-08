@@ -1,0 +1,325 @@
+<!DOCTYPE html SYSTEM "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>German-noun-to-Swedish-noun</title>
+<meta charset="utf-8"/>
+<style>
+/* TreeFlex CSS - Grammar Tree Display */
+
+.tf-tree {
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    overflow: auto;
+}
+
+.tf-tree, .tf-tree * {
+    box-sizing: border-box;
+}
+
+.tf-tree ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    margin-left: 2em;
+}
+
+.tf-tree li {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    margin-bottom: 0.5em;
+}
+
+.tf-nc {
+    display: inline-block;
+    border: 1px solid #333;
+    padding: 0.4em 0.8em;
+    background-color: #f9f9f9;
+    cursor: pointer;
+    border-radius: 3px;
+    user-select: none;
+}
+
+.tf-nc:hover {
+    background-color: #f0f0f0;
+    border-color: #000;
+}
+
+.tf-nc.headword {
+    font-weight: bold;
+    background-color: #ffffcc;
+}
+
+.word {
+    display: inline-block;
+    margin-right: 0.2em;
+}
+
+.phrase {
+    display: inline-block;
+    margin-right: 0.2em;
+}
+
+.category {
+    display: inline-block;
+    padding: 0.2em 0.4em;
+    background-color: #e8f4f8;
+    border-radius: 2px;
+    font-size: 0.9em;
+    margin: 0 0.2em;
+    cursor: pointer;
+}
+
+.categorytgt {
+    display: inline-block;
+    padding: 0.2em 0.4em;
+    background-color: #f0e8f8;
+    border-radius: 2px;
+    font-size: 0.9em;
+    margin: 0 0.2em;
+    cursor: pointer;
+}
+
+.feature {
+    display: inline;
+    padding: 0.1em 0.3em;
+    background-color: #fff0f5;
+    border-radius: 2px;
+    margin: 0 0.1em;
+    font-size: 0.85em;
+    cursor: pointer;
+}
+
+.feature.headfeature {
+    background-color: #ffe0b2;
+    font-weight: bold;
+}
+
+.ranking {
+    vertical-align: super;
+    font-size: 0.7em;
+    margin-left: 0.2em;
+}
+
+.unmarked {
+    display: inline;
+    margin-left: 0.3em;
+    font-style: italic;
+    color: #666;
+}
+
+.index {
+    display: inline;
+    margin-left: 0.2em;
+    font-size: 0.8em;
+    color: #999;
+}
+
+.language {
+    display: inline;
+    margin-left: 0.3em;
+    font-size: 0.9em;
+    font-style: italic;
+    color: #666;
+}
+
+.affix {
+    display: inline-block;
+    padding: 0.2em 0.4em;
+    background-color: #f5f0e8;
+    border-radius: 2px;
+    margin: 0 0.2em;
+    cursor: pointer;
+}
+
+.arrow {
+    display: inline-block;
+    margin: 0 1em;
+    font-size: 1.2em;
+    color: #666;
+}
+
+/* Table layout for source/target display */
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+td {
+    padding: 1em;
+    vertical-align: top;
+}
+
+/* Remove bullets from nested lists */
+.tf-tree ul li ul {
+    margin-left: 1em;
+    margin-top: 0.5em;
+}
+
+/**
+ * Copyright (c) 2023-2024 SIL International
+ * This software is licensed under the LGPL, version 2.1 or later
+ * (http://www.gnu.org/licenses/lgpl-2.1.html)
+ */
+/* rulegen.css for FLExTrans rule assistant */
+
+.arrow:before {
+    content:" → ";
+}
+.arrow {
+    font-size:x-large;
+    font-size:250%;
+}
+
+.affix {
+    color:maroon;
+}
+
+.category {
+    color:red;
+}
+
+.categorytgt {
+    color:red;
+    font-style: italic;
+/*    opacity: 0.75;  not using because it makes underscores not show */
+    filter: grayscale(50%);
+}
+
+.feature {
+    color:blue;
+}
+
+.head:before {
+    content:"(head)";    
+}
+.head {
+    font-style:italic;
+}
+
+.headfeature {
+	font-weight:bold;
+}
+
+.headword {
+	font-weight:bold;
+}
+
+.index {
+    font-size:x-small;
+    font-style:italic;
+    vertical-align:sub;
+}
+
+.language {
+    font-size:smaller;
+    font-style:italic;
+    vertical-align:sub;
+}
+
+.ranking:before {
+	content:" (rank:"
+}
+.ranking {
+	margin-left:1em;
+	font-weight:normal;
+	font-size:smaller;
+}
+.ranking:after {
+	content:")"
+}
+
+.unmarked {
+	margin-left:1em;
+	font-weight:normal;
+	font-size:smaller;
+}
+
+</style>
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    new QWebChannel(qt.webChannelTransport, function(channel) {
+        window.ftRuleGenApp = channel.objects.ftRuleGenApp;
+    });
+});
+
+function toApp(msg, event) {
+    if (window.ftRuleGenApp) {
+        ftRuleGenApp.setXCoord(event.screenX);
+        ftRuleGenApp.setYCoord(event.screenY);
+        ftRuleGenApp.setItemClickedOn(msg);
+    }
+    return false;
+}
+</script>
+
+</head>
+<body>
+<table>
+<tr>
+<td valign="top">
+<span class="tf-tree tf-gap-sm">
+<ul>
+<li><span class="tf-nc" id="p.1" onmousedown="toApp('p.1',event)">phrase<span class="language">src</span></span>
+<ul><li><table class="tf-nc">
+<tr>
+<td align="center"><span class="headword" id="w.2" onmousedown="toApp('w.2',event)">word(<span style="font-style:italic; font-size:smaller">head</span>)<span class="index">1</span>
+</span>
+</td>
+</tr>
+<tr>
+<td align="center"><span class="category" id="c.3" onmousedown="toApp('c.3',event)">cat:n</span></td>
+</tr>
+</table>
+<ul>
+<li><table class="tf-nc">
+<tr>
+<td align="left"><span class="feature headfeature" id="f.4" onmousedown="toApp('f.4',event)">gender:m</span></td>
+</tr>
+<tr>
+<td align="left"><span class="feature headfeature" id="f.5" onmousedown="toApp('f.5',event)">number:sg</span></td>
+</tr>
+</table>
+</li>
+</ul>
+</li></ul></li>
+</ul>
+</span>
+</td>
+<td>
+<span class="arrow"/>
+</td>
+<td valign="top">
+<span class="tf-tree tf-gap-sm">
+<ul>
+<li><span class="tf-nc" id="p.6" onmousedown="toApp('p.6',event)">phrase<span class="language">tgt</span></span>
+<ul><li><table class="tf-nc">
+<tr>
+<td align="center"><span class="headword" id="w.7" onmousedown="toApp('w.7',event)">word(<span style="font-style:italic; font-size:smaller">head</span>)<span class="index">1</span>
+</span>
+</td>
+</tr>
+<tr>
+<td align="center"><span class="category" id="c.8" onmousedown="toApp('c.8',event)">cat:n</span></td>
+</tr>
+</table>
+<ul>
+<li><table class="tf-nc">
+<tr>
+<td align="left"><span class="feature headfeature" id="f.9" onmousedown="toApp('f.9',event)">gender:com</span></td>
+</tr>
+<tr>
+<td align="left"><span class="feature headfeature" id="f.10" onmousedown="toApp('f.10',event)">number:sg</span></td>
+</tr>
+</table>
+</li>
+</ul>
+</li></ul></li>
+</ul>
+</span>
+</td>
+</tr>
+</table>
+</body>
+</html>
