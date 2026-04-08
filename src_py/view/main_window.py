@@ -6,8 +6,8 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QLabel, QListWidget, QListWidgetItem, QLineEdit, QPlainTextEdit,
-    QCheckBox, QPushButton, QMenu, QAction, QComboBox, QMessageBox,
-    QWebEngineView, QButtonBar, QInputDialog, QDialog
+    QCheckBox, QPushButton, QMenu, QComboBox, QMessageBox,
+    QInputDialog, QDialog
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebChannel import QWebChannel
