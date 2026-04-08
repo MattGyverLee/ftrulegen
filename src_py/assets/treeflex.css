@@ -45,6 +45,20 @@
     background-color: #ffffcc;
 }
 
+/* Table styling for tree nodes */
+table.tf-nc {
+    border: 1px solid #333;
+    background-color: #f9f9f9;
+    border-radius: 3px;
+    display: inline-table;
+    cursor: pointer;
+}
+
+table.tf-nc:hover {
+    background-color: #f0f0f0;
+    border-color: #000;
+}
+
 .word {
     display: inline-block;
     margin-right: 0.2em;
