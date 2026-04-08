@@ -119,7 +119,6 @@ class RuleAssistantWindow(QMainWindow):
 
         # Set initial splitter sizes (30% left, 70% right)
         splitter.setSizes([200, 460])
-        splitter.setResizableWithParent(False)
 
         self.resize(660, 1000)
 

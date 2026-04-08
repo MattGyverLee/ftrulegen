@@ -3,7 +3,8 @@
     "allow": [
       "Bash(PYTHONPATH='d:/Github/_Projects/_LEX/ftrulegen' python -m pytest 'src-py/tests/test_model.py::TestEnums::test_affix_type_values' -v)",
       "Bash(python -m pytest --collect-only 'src-py/tests/')",
-      "Bash(python -m pytest 'src-py/tests/test_model.py::TestEnums::test_affix_type_values' -v)"
+      "Bash(python -m pytest 'src-py/tests/test_model.py::TestEnums::test_affix_type_values' -v)",
+      "Bash(python:*)"
     ]
   }
 }
