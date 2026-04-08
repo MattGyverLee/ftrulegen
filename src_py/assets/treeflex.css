@@ -1,166 +1,196 @@
-/* TreeFlex CSS - Grammar Tree Display */
+/* TreeFlex CSS - Grammar Tree with Connector Lines */
+/* From: node_modules/treeflex/dist/css/treeflex.css */
 
 .tf-tree {
-    font-family: Arial, sans-serif;
-    font-size: 14px;
-    line-height: 1.5;
-    overflow: auto;
+    font-size: 16px;
+    overflow: auto
 }
 
-.tf-tree, .tf-tree * {
+.tf-tree * {
     box-sizing: border-box;
+    margin: 0;
+    padding: 0
 }
 
 .tf-tree ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    margin-left: 2em;
+    display: inline-flex
 }
 
 .tf-tree li {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    margin-bottom: 0.5em;
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    padding: 0 1em;
+    position: relative
 }
 
-.tf-nc {
+.tf-tree li ul {
+    margin: 2em 0
+}
+
+/* Horizontal connector lines between siblings */
+.tf-tree li li:before {
+    border-top: .0625em solid #000;
+    content: "";
+    display: block;
+    height: .0625em;
+    left: -.03125em;
+    position: absolute;
+    top: -1.03125em;
+    width: 100%
+}
+
+.tf-tree li li:first-child:before {
+    left: calc(50% - .03125em);
+    max-width: calc(50% + .0625em)
+}
+
+.tf-tree li li:last-child:before {
+    left: auto;
+    max-width: calc(50% + .0625em);
+    right: calc(50% - .03125em)
+}
+
+.tf-tree li li:only-child:before {
+    display: none
+}
+
+.tf-tree li li:only-child > .tf-nc:before,
+.tf-tree li li:only-child > .tf-node-content:before {
+    height: 1.0625em;
+    top: -1.0625em
+}
+
+/* Node boxes */
+.tf-tree .tf-nc,
+.tf-tree .tf-node-content {
+    border: .0625em solid #000;
     display: inline-block;
-    border: 1px solid #333;
-    padding: 0.4em 0.8em;
-    background-color: #f9f9f9;
-    cursor: pointer;
-    border-radius: 3px;
-    user-select: none;
+    padding: .25em .5em;
+    position: relative
 }
 
-.tf-nc:hover {
-    background-color: #f0f0f0;
-    border-color: #000;
+.tf-tree .tf-nc:before,
+.tf-tree .tf-node-content:before {
+    top: -1.03125em
 }
 
-.tf-nc.headword {
-    font-weight: bold;
-    background-color: #ffffcc;
+/* Vertical connector lines from parent to children */
+.tf-tree .tf-nc:after,
+.tf-tree .tf-nc:before,
+.tf-tree .tf-node-content:after,
+.tf-tree .tf-node-content:before {
+    border-left: .0625em solid #000;
+    content: "";
+    display: block;
+    height: 1em;
+    left: calc(50% - .03125em);
+    position: absolute;
+    width: .0625em
 }
 
-/* Table styling for tree nodes */
-table.tf-nc {
-    border: 1px solid #333;
-    background-color: #f9f9f9;
-    border-radius: 3px;
-    display: inline-table;
-    cursor: pointer;
+.tf-tree .tf-nc:after,
+.tf-tree .tf-node-content:after {
+    top: calc(100% + .03125em)
 }
 
-table.tf-nc:hover {
-    background-color: #f0f0f0;
-    border-color: #000;
+.tf-tree .tf-nc:only-child:after,
+.tf-tree .tf-node-content:only-child:after,
+.tf-tree > ul > li > .tf-nc:before,
+.tf-tree > ul > li > .tf-node-content:before {
+    display: none
 }
 
-.word {
-    display: inline-block;
-    margin-right: 0.2em;
+/* Gap sizing */
+.tf-tree.tf-gap-sm li {
+    padding: 0 .6em
 }
 
-.phrase {
-    display: inline-block;
-    margin-right: 0.2em;
+.tf-tree.tf-gap-sm li > .tf-nc:before,
+.tf-tree.tf-gap-sm li > .tf-node-content:before {
+    height: .6em;
+    top: -.6em
 }
 
-.category {
-    display: inline-block;
-    padding: 0.2em 0.4em;
-    background-color: #e8f4f8;
-    border-radius: 2px;
-    font-size: 0.9em;
-    margin: 0 0.2em;
-    cursor: pointer;
+.tf-tree.tf-gap-sm li > .tf-nc:after,
+.tf-tree.tf-gap-sm li > .tf-node-content:after {
+    height: .6em
 }
 
-.categorytgt {
-    display: inline-block;
-    padding: 0.2em 0.4em;
-    background-color: #f0e8f8;
-    border-radius: 2px;
-    font-size: 0.9em;
-    margin: 0 0.2em;
-    cursor: pointer;
+.tf-tree.tf-gap-sm li ul {
+    margin: 1.2em 0
 }
 
-.feature {
-    display: inline;
-    padding: 0.1em 0.3em;
-    background-color: #fff0f5;
-    border-radius: 2px;
-    margin: 0 0.1em;
-    font-size: 0.85em;
-    cursor: pointer;
+.tf-tree.tf-gap-sm li li:before {
+    top: -.63125em
 }
 
-.feature.headfeature {
-    background-color: #ffe0b2;
-    font-weight: bold;
+.tf-tree.tf-gap-sm li li:only-child > .tf-nc:before,
+.tf-tree.tf-gap-sm li li:only-child > .tf-node-content:before {
+    height: .6625em;
+    top: -.6625em
 }
 
-.ranking {
-    vertical-align: super;
-    font-size: 0.7em;
-    margin-left: 0.2em;
+.tf-tree.tf-gap-lg li {
+    padding: 0 1.5em
 }
 
-.unmarked {
-    display: inline;
-    margin-left: 0.3em;
-    font-style: italic;
-    color: #666;
+.tf-tree.tf-gap-lg li > .tf-nc:before,
+.tf-tree.tf-gap-lg li > .tf-node-content:before {
+    height: 1.5em;
+    top: -1.5em
 }
 
-.index {
-    display: inline;
-    margin-left: 0.2em;
-    font-size: 0.8em;
-    color: #999;
+.tf-tree.tf-gap-lg li > .tf-nc:after,
+.tf-tree.tf-gap-lg li > .tf-node-content:after {
+    height: 1.5em
 }
 
-.language {
-    display: inline;
-    margin-left: 0.3em;
-    font-size: 0.9em;
-    font-style: italic;
-    color: #666;
+.tf-tree.tf-gap-lg li ul {
+    margin: 3em 0
 }
 
-.affix {
-    display: inline-block;
-    padding: 0.2em 0.4em;
-    background-color: #f5f0e8;
-    border-radius: 2px;
-    margin: 0 0.2em;
-    cursor: pointer;
+.tf-tree.tf-gap-lg li li:before {
+    top: -1.53125em
 }
 
-.arrow {
-    display: inline-block;
-    margin: 0 1em;
-    font-size: 1.2em;
-    color: #666;
+.tf-tree.tf-gap-lg li li:only-child > .tf-nc:before,
+.tf-tree.tf-gap-lg li li:only-child > .tf-node-content:before {
+    height: 1.5625em;
+    top: -1.5625em
 }
 
-/* Table layout for source/target display */
-table {
-    border-collapse: collapse;
-    width: 100%;
+/* Dotted style */
+.tf-tree li.tf-dotted-children .tf-nc:after,
+.tf-tree li.tf-dotted-children .tf-nc:before,
+.tf-tree li.tf-dotted-children .tf-node-content:after,
+.tf-tree li.tf-dotted-children .tf-node-content:before {
+    border-left-style: dotted
 }
 
-td {
-    padding: 1em;
-    vertical-align: top;
+.tf-tree li.tf-dotted-children li:before {
+    border-top-style: dotted
 }
 
-/* Remove bullets from nested lists */
-.tf-tree ul li ul {
-    margin-left: 1em;
-    margin-top: 0.5em;
+.tf-tree li.tf-dotted-children > .tf-nc:before,
+.tf-tree li.tf-dotted-children > .tf-node-content:before {
+    border-left-style: solid
+}
+
+/* Dashed style */
+.tf-tree li.tf-dashed-children .tf-nc:after,
+.tf-tree li.tf-dashed-children .tf-nc:before,
+.tf-tree li.tf-dashed-children .tf-node-content:after,
+.tf-tree li.tf-dashed-children .tf-node-content:before {
+    border-left-style: dashed
+}
+
+.tf-tree li.tf-dashed-children li:before {
+    border-top-style: dashed
+}
+
+.tf-tree li.tf-dashed-children > .tf-nc:before,
+.tf-tree li.tf-dashed-children > .tf-node-content:before {
+    border-left-style: solid
 }
